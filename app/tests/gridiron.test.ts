@@ -1,0 +1,10 @@
+import {test,expect} from 'bun:test';
+import {samplePlayers,optimize,current,total,eligible,SLOTS,estimate,mean,simulate,waivers} from '../src/lib/gridiron';
+test('optimal lineup improves sample, with exactly one eligible player in each slot',()=>{const ps=samplePlayers(),b=optimize(ps);expect(b.score).toBeGreaterThan(total(current(ps)));expect(new Set(b.picks.map(p=>p?.id)).size).toBe(9);b.picks.forEach((p,i)=>expect(p&&eligible(p,SLOTS[i])).toBe(true));});
+test('locked starter stays and locked bench cannot enter',()=>{const ps=samplePlayers();ps[6].locked=true;ps[9].locked=true;const b=optimize(ps);expect(b.picks[6]?.id).toBe(ps[6].id);expect(b.picks.some(p=>p?.id===ps[9].id)).toBe(false);});
+test('out and bye players excluded from unlocked picks',()=>{const ps=samplePlayers();ps[9].bye=true;const b=optimize(ps);expect(b.picks.some(p=>p?.bye||p?.status==='OUT')).toBe(false);});
+test('mean differs correctly from median for skewed scores',()=>expect(mean([0,0,30])).toBe(10));
+test('weighted baseline uses recent games more',()=>{const p=samplePlayers()[0];expect(estimate({...p,history:[10,20]})).toBeCloseTo(50/3);});
+test('simulation is deterministic and output bounded',()=>{const ps=current(samplePlayers()).filter(Boolean) as ReturnType<typeof samplePlayers>;const a=simulate(ps);expect(a).toEqual(simulate(ps));expect(a.win).toBeGreaterThanOrEqual(0);expect(a.win).toBeLessThanOrEqual(1);});
+test('applying a lineup cannot change the fixed sample opponent',()=>{const ps=samplePlayers(),a=simulate(current(ps).filter(Boolean) as typeof ps),b=simulate(optimize(ps).picks.filter(Boolean) as typeof ps);expect(a.b).toBe(b.b);});
+test('waiver improvements ordered by marginal lineup gain',()=>{const w=waivers(samplePlayers());expect(w[0].gain).toBeGreaterThan(0);expect(w.every((v,i)=>!i||v.gain<=w[i-1].gain)).toBe(true);});
