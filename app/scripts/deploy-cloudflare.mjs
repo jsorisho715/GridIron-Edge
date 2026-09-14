@@ -134,7 +134,8 @@ async function main() {
   const paths=new Set(['/manifest.webmanifest','/sw.js','/offline.html','/icon-192.png','/icon-512.png','/robots.txt']);
   for(const match of pageHTML.matchAll(/(?:href|src)="(\/assets\/[^"?#]+)"/g))paths.add(match[1]);
   let assetsChecked=0;
-  const asset=async path=>{const r=await get(path);check(r.ok,'A deployed asset failed to load: '+path);assetsChecked++;if(r.headers.get('content-type')?.includes('text/css')){const css=await r.text();check(!/data:font\//.test(css),'Inline fonts violate the production CSP.');return [...css.matchAll(/url\(["']?([^"')]+)["']?\)/g)].map(m=>new URL(m[1],origin+path)).filter(u=>u.origin===origin&&/\.woff2?$/.test(u.pathname)).map(u=>u.pathname);}await r.arrayBuffer();return [];};
+  const {loadDeployedAsset}=await import('./deployment-checks.mjs');
+  const asset=async path=>{const r=await loadDeployedAsset(path,get);assetsChecked++;if(r.headers.get('content-type')?.includes('text/css')){const css=await r.text();check(!/data:font\//.test(css),'Inline fonts violate the production CSP.');return [...css.matchAll(/url\(["']?([^"')]+)["']?\)/g)].map(m=>new URL(m[1],origin+path)).filter(u=>u.origin===origin&&/\.woff2?$/.test(u.pathname)).map(u=>u.pathname);}await r.arrayBuffer();return [];};
   const fonts=new Set();const initial=[...paths];for(let i=0;i<initial.length;i+=6)for(const found of await Promise.all(initial.slice(i,i+6).map(asset)))for(const path of found)fonts.add(path);
   const fontPaths=[...fonts];for(let i=0;i<fontPaths.length;i+=6)await Promise.all(fontPaths.slice(i,i+6).map(asset));
   console.log('Production loading checks passed: '+assetsChecked+' install, script, style and font assets.');
