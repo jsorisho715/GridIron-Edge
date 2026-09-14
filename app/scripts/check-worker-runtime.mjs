@@ -24,7 +24,7 @@ export async function checkWorkerRuntime(wranglerPackage) {
       import { input, leagueFixture } from ${JSON.stringify(resolve("tests/fixtures/live.ts"))};
       export default { async fetch(request, env) {
         const path=new URL(request.url).pathname;
-        if(path==='/migrate'){const sql=${JSON.stringify(['0002_secure_espn.sql','0003_live_workspace.sql','0004_decision_advisor.sql'].map(file=>readFileSync(resolve('migrations',file),'utf8').replace(/^--.*$/gm,'')).join('\n'))};await env.DB.batch(sql.split(';').map(s=>s.trim()).filter(Boolean).map(s=>env.DB.prepare(s)));return Response.json({migrated:true});}
+        if(path==='/migrate'){const sql=${JSON.stringify(['0002_secure_espn.sql','0003_live_workspace.sql','0005_player_memory.sql','0004_decision_advisor.sql'].map(file=>readFileSync(resolve('migrations',file),'utf8').replace(/^--.*$/gm,'')).join('\n'))};await env.DB.batch(sql.split(';').map(s=>s.trim()).filter(Boolean).map(s=>env.DB.prepare(s)));return Response.json({migrated:true});}
         if(path==='/fixture')return Response.json(leagueFixture());
         if(path==='/seed'){
           await env.DB.prepare('INSERT INTO ge_espn_connection VALUES(1,?,?,?)').bind(await encryptConnection(env.CREDENTIAL_ENCRYPTION_KEY,input),JSON.stringify({leagueId:input.leagueId,teamId:input.teamId,season:input.season}),'runtime-revision').run();
@@ -62,7 +62,7 @@ export async function checkWorkerRuntime(wranglerPackage) {
           if(url.hostname==='fcm.googleapis.com'){
             pushCalls++;assert.equal(request.headers.get('content-encoding'),'aes128gcm');assert.match(request.headers.get('authorization'),/vapid/);return new Response(null,{status:201});
           }
-          assert.equal(url.hostname,'lm-api-reads.fantasy.espn.com');assert.equal(request.method,'GET');
+          if(url.hostname==='site.api.espn.com'){assert.equal(request.headers.get('cookie'),null);return Response.json(url.pathname.endsWith('news')?{articles:[]}:url.pathname.endsWith('injuries')?{injuries:[]}:{events:[]});}if(url.pathname.endsWith('/communication/'))return Response.json({topics:[]});assert.equal(url.hostname,'lm-api-reads.fantasy.espn.com');assert.equal(request.method,'GET');
           if(views.includes('proTeamSchedules_wl')){assert.equal(request.headers.get('cookie'),null);return Response.json(fixture.schedule);}
           assert.match(request.headers.get('cookie'),/synthetic-cookie-for-tests-only/);
           return Response.json(views.includes('kona_playercard')?fixture.cards:views.includes('kona_player_info')?fixture.free:fixture.core);

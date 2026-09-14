@@ -17,10 +17,11 @@ process.on('exit',()=>devServer?.kill());
   const generated=spawnSync('bun',['run','scripts/qa-fixture.ts'],{encoding:'utf8'});assert.equal(generated.status,0,generated.stderr);
   let state=JSON.parse(generated.stdout),locked=true,failSync=false,holdRead=false,releaseRead,readStarted;
   let advisor=state.advisor;delete state.advisor;
+  await page.route('https://a.espncdn.com/i/headshots/**',route=>route.request().url().endsWith('/2500.png')?route.abort():route.fulfill({status:200,headers:{'Access-Control-Allow-Origin':'*'},contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48"><rect width="48" height="48" fill="#eaf0e8"/><circle cx="24" cy="18" r="9" fill="#6b8b73"/><path d="M8 48v-9c0-14 32-14 32 0v9" fill="#6b8b73"/></svg>'}));
   page.on('pageerror',e=>errors.push(e.message));
-  await page.route('**/api/gridiron/workspace',async route=>{
+  await page.route('**/api/gridiron/workspace*',async route=>{
     if(locked)return route.fulfill({status:401,contentType:'application/json',body:JSON.stringify({error:'Unlock your private workspace.',code:'locked'})});
-    const body=route.request().postDataJSON();let result=state;
+    if(new URL(route.request().url()).searchParams.has('player'))return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({events:[{kind:'injury',summary:'ESPN fantasy availability changed from QUESTIONABLE to ACTIVE.',observedAt:Date.now()}],forecasts:[{player_id:'2500',season:2026,week:1,forecast_at:Date.now()-86400000,kickoff:Date.now()-3600000,estimate:15,actual:17,espn:16,baseline:13}]})});const body=route.request().postDataJSON();let result=state;
     if(!body&&holdRead){holdRead=false;readStarted();await new Promise(resolve=>{releaseRead=resolve;});}
     if(body?.action==='preferences'){state.preferences={...state.preferences,...body,updatedAt:Date.now()};result={preferences:state.preferences};}
     if(body?.action==='sync')result={synced:!failSync,workspace:state,...(failSync?{error:'Synthetic provider outage'}:{})};
@@ -52,6 +53,15 @@ process.on('exit',()=>devServer?.kill());
   await page.screenshot({path:'/tmp/gridiron-live-desktop.png',fullPage:true});
   await page.getByRole('button',{name:'Review lineup',exact:true}).click();await page.getByRole('dialog').waitFor();await axe('lineup-dialog');await page.keyboard.press('Escape');
   const desktopNav=page.getByRole('navigation',{name:'Main navigation'});
+  await desktopNav.getByRole('button',{name:'Opponents',exact:true}).click();
+  await page.getByRole('heading',{name:'Opponent Team 2',exact:true}).waitFor();
+  await page.getByText('Managed by Manager 2',{exact:true}).waitFor();
+  assert(await page.getByText('CONFIRMED BY ESPN',{exact:true}).count());
+  assert(await page.getByText('NOTICED BETWEEN REFRESHES',{exact:true}).count());
+  await page.getByLabel('Show',{exact:true}).selectOption('trade');assert.equal(await page.locator('.gi-activity').count(),1);
+  await page.getByLabel('Show',{exact:true}).selectOption('all');
+  await page.getByLabel('Who are we watching?').selectOption('3');await page.getByText('Managed by Manager 3',{exact:true}).waitFor();
+  await page.getByLabel('Who are we watching?').selectOption('2');await axe('desktop-opponents');await overflow();await page.screenshot({path:'/tmp/gridiron-opponents-desktop.png',fullPage:true});
   await desktopNav.getByRole('button',{name:'Players',exact:true}).click();
   await page.getByLabel('Search players').fill('Alex');
   const select=page.getByRole('button',{name:/Select .* for comparison/});await select.nth(0).click();await select.nth(1).click();await page.getByRole('button',{name:'Compare players',exact:true}).click();await page.getByRole('heading',{name:'Make the clearer call.'}).waitFor();await axe('comparison-dialog');await page.keyboard.press('Escape');
@@ -67,6 +77,20 @@ process.on('exit',()=>devServer?.kill());
   assert.equal(await page.evaluate(()=>localStorage.getItem('gridiron-sample-v1')),null);
   for(const width of [360,412,448]){
     await page.setViewportSize({width,height:998});await page.getByRole('navigation',{name:'Mobile navigation'}).getByRole('button',{name:'Today',exact:true}).click();await overflow();
+    await page.getByRole('navigation',{name:'Mobile navigation'}).getByRole('button',{name:'My team',exact:true}).click();
+    await page.locator('.ge-player-name').first().click();await page.getByRole('dialog').waitFor();
+    await page.locator('dialog .gi-help summary').filter({hasText:'Picked in ESPN leagues'}).click();
+    await page.getByText(/6% means about 6 out of every 100/).waitFor();await overflow();
+    await page.getByText('Too early to tell',{exact:false}).waitFor();
+    assert.equal(await page.locator('dialog .gi-photo-large img').count(),0,'Broken headshot should use initials');
+    await page.locator('dialog summary').filter({hasText:'Saved player history & prediction results'}).click();
+    await page.getByText('Actual: 17.0 · Missed by 2.0 points',{exact:true}).waitFor();
+    if(width===448)await axe('pixel-player-help-memory');
+    await page.keyboard.press('Escape');
+    await page.getByRole('navigation',{name:'Mobile navigation'}).getByRole('button',{name:'More',exact:true}).click();
+    await page.locator('.ge-more').getByRole('button',{name:'Opponents',exact:true}).click();await overflow();
+    if(width===448){await axe('pixel-opponents');await page.screenshot({path:'/tmp/gridiron-opponents-pixel.png',fullPage:true});}
+    await page.getByRole('navigation',{name:'Mobile navigation'}).getByRole('button',{name:'Today',exact:true}).click();
     if(width===448){await axe('pixel-today');await page.screenshot({path:'/tmp/gridiron-live-pixel.png',fullPage:true});}
     await page.getByRole('navigation',{name:'Mobile navigation'}).getByRole('button',{name:'More',exact:true}).click();await overflow();
     await page.locator('.ge-more').getByRole('button',{name:'Waiver wire',exact:true}).click();await overflow();

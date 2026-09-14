@@ -1,4 +1,4 @@
-export type GameLog = { season: number; week: number; points: number; projected: number | null };
+export type GameLog = { season: number; week: number; points: number; projected: number | null; usage?: import('./player-usage').PlayerUsage };
 export type FutureGame = { week: number; opponent: string | null; kickoff: string | null; bye: boolean; known: boolean; projected: number | null };
 export type Slot = { id: string; espnId: number; label: string };
 export type LeaguePlayer = {
@@ -8,8 +8,9 @@ export type LeaguePlayer = {
   kickoff: string | null; opponent: string | null; bye: boolean; scheduleKnown: boolean;
   projected: number | null; actual: number | null; history: GameLog[];
   future?: FutureGame[];
+  opponentProTeamId?: number | null;
 };
-export type LeagueTeam = { id: number; name: string; wins: number; losses: number; ties: number; pointsFor: number; pointsAgainst: number; rank: number | null };
+export type LeagueTeam = { id: number; name: string; managers?: { name: string; kind: 'name' | 'display' }[]; wins: number; losses: number; ties: number; pointsFor: number; pointsAgainst: number; rank: number | null };
 export type Matchup = { homeId: number; awayId: number | null; homeScore: number | null; awayScore: number | null; week: number; endWeek: number };
 export type Snapshot = {
   leagueId: number; teamId: number; season: number; week: number; matchupPeriod: number;
@@ -18,6 +19,8 @@ export type Snapshot = {
   teams: LeagueTeam[]; players: LeaguePlayer[]; matchups: Matchup[]; warnings: string[];
   sources: { league: string; history: string | null; schedule: string | null; waivers: string | null };
   tradeDeadline?: number | null;
+  intel?: import('./league-intel').LeagueIntel;
+  playerMemory?: Record<string, string[]>;
 };
 export type Preferences = { watched: string[]; notes: string; reviewed: string[]; paused: boolean; updatedAt: number };
 export type Alert = { id: string; title: string; detail: string; playerId: string | null; kind: string; createdAt: number };

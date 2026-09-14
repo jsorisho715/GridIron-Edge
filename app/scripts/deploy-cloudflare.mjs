@@ -173,6 +173,13 @@ async function main() {
         check(!JSON.stringify(advice).includes('"envelope"'),'Decision API exposed a credential field.');
         console.log('Decision desk verified: '+JSON.stringify({decisions:advice.decisions.length,kinds:[...new Set(advice.decisions.map(d=>d.kind))],stale:advice.stale,aiConfigured:advice.configured,aiEnabled:advice.enabled,futureSchedule:mine.filter(p=>p.future?.some(g=>g.week>s.week&&g.known)).length}));
         console.log("Live league verified: " + JSON.stringify({ season: s.season, week: s.week, schedulerSeen: !!workspace.health.heartbeat, schedulerAgeMinutes: workspace.health.heartbeat?Math.round((Date.now()-workspace.health.heartbeat)/60000):null, teams: s.teams.length, roster: mine.length, slots: s.slots.length, pool: s.players.length, withHistory: mine.filter(p => p.history.length).length, withSchedule: mine.filter(p => p.scheduleKnown).length, withProjection: mine.filter(p => p.projected !== null).length, warnings: s.warnings }));
+        if(!workspace.preferences.paused){check(s.intel&&s.playerMemory,'Intelligence snapshot did not upgrade.');}
+        if(s.intel){
+          const memory=mine[0]?await (await privateCall('/api/gridiron/workspace?player='+mine[0].id)).json():{events:[],forecasts:[]};
+          check(Array.isArray(memory.events)&&Array.isArray(memory.forecasts),'Player memory did not load.');
+          const photos=await Promise.all(mine.filter(p=>p.position!=='DST'&&/^\d+$/.test(p.id)).slice(0,3).map(async p=>{try{const r=await fetch('https://a.espncdn.com/i/headshots/nfl/players/full/'+p.id+'.png',{method:'HEAD',redirect:'manual',signal:AbortSignal.timeout(12000)});return r.ok&&r.headers.get('content-type')?.startsWith('image/');}catch{return false;}}));
+          console.log('Player intelligence verified: '+JSON.stringify({managerNames:s.teams.filter(t=>t.managers?.some(m=>m.kind==='name')).length,displayNames:s.teams.filter(t=>t.managers?.some(m=>m.kind==='display')).length,transactionFeed:!!s.intel.transactions.checkedAt,transactions:s.intel.activity.filter(e=>e.source==='espn').length,headlines:s.intel.news.length,nflInjuries:s.intel.nfl?.injuries.length??0,nflGames:s.intel.nfl?.games.length??0,gamesWithLines:s.intel.nfl?.games.filter(g=>g.total!==null).length??0,withUsage:mine.filter(p=>p.history.some(g=>g.usage&&Object.keys(g.usage).length)).length,memoryEvents:memory.events.length,savedForecasts:memory.forecasts.length,headshotsLoaded:photos.filter(Boolean).length,headshotsChecked:photos.length,feedErrors:[s.intel.transactions.error,s.intel.headlines.error,s.intel.nfl?.injuryFeed.error,s.intel.nfl?.marketFeed.error].filter(Boolean)}));
+        }
       }
     } else console.log("No ESPN connection saved; secure first-run screen verified.");
   } finally {

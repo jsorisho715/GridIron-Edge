@@ -1,11 +1,14 @@
 import {bestLineup,forecast,isHeld,projectedTotal,starters,unavailable,type LeaguePlayer,type Snapshot} from './football';
+import {currentOpponent,opponentDecisionContext} from './league-intel';
+import {usageEvidence} from './player-usage';
+import {matchupEvidence,matchupContext} from './nfl-context';
 
-export const ADVISOR_VERSION='2026-09-14.1';
+export const ADVISOR_VERSION='2026-09-14.2';
 export const ADVISOR_MODEL='gpt-5.6-luna';
 export type Risk='careful'|'balanced'|'upside';
 export type DecisionStatus='approved'|'declined'|'completed';
 export type Decision={
-  id:string; fingerprint:string; kind:'lineup'|'waiver'|'ir'|'trade'; title:string;
+  id:string; fingerprint:string; kind:'lineup'|'waiver'|'ir'|'trade'|'matchup'; title:string;
   players:string[]; gain:number|null; horizon:string; evidence:string[]; cautions:string[];
   moves:{playerId:string;slot:string}[]; expiresAt:number; link:string;
   status?:DecisionStatus; ai?:{verdict:'pursue'|'watch';priority:number;evidence:number[];cautions:number[]};
@@ -24,13 +27,13 @@ export async function digest(value:unknown){const bytes=await crypto.subtle.dige
 // Excludes sync timestamps, live scores, team names and notes. Half-point buckets
 // avoid spending tokens on inconsequential projection movement.
 export function evidenceKey(s:Snapshot,risk:Risk,now=Date.now()){
-  return [ADVISOR_VERSION,scopeOf(s),s.week,s.slots,s.rosterLimit,s.tradeDeadline,risk,
+  return [ADVISOR_VERSION,scopeOf(s),s.week,s.slots,s.rosterLimit,s.tradeDeadline,risk,currentOpponent(s)?.id,s.playerMemory,
     s.players.map(p=>[p.id,p.teamId,p.slot,p.eligible,p.status,p.availability,p.droppable,isHeld(p,now),p.bye,p.scheduleKnown,p.kickoff,
       p.projected===null?null:Math.round(p.projected*2)/2,baseline(p)===null?null:Math.round(baseline(p)!*2)/2,
-      p.history.length,p.future?.map(g=>[g.week,g.opponent,g.bye,g.known,g.kickoff,g.projected===null?null:Math.round(g.projected*2)/2])])];
+      p.history.length,usageEvidence(p),matchupEvidence(p,s,now),p.future?.map(g=>[g.week,g.opponent,g.bye,g.known,g.kickoff,g.projected===null?null:Math.round(g.projected*2)/2])])];
 }
 function scheduleText(p:LeaguePlayer){return (p.future??[]).slice(0,4).map(g=>`W${g.week}: ${g.bye?'bye':g.opponent??'schedule unknown'}`).join(' · ')||'Future schedule unavailable';}
-function evidence(p:LeaguePlayer){const f=forecast(p);return `${p.name}: ${f.points===null?'no current estimate':rounded(f.points)+' estimated points'}; ${p.status}; ${f.games} recent games. ${f.method}.`;}
+function evidence(p:LeaguePlayer){const f=forecast(p);return `${p.name}: ${f.points===null?'no current estimate':rounded(f.points)+' estimated points'}; ${p.status}; ${f.games} recent games. ${f.method}. ${usageEvidence(p)}`.trim();}
 function healthyFuture(p:LeaguePlayer,s:Snapshot,w:number):LeaguePlayer|null{
   const g=p.future?.find(g=>g.week===w),b=baseline(p);
   if(!g?.known||b===null||p.status!=='ACTIVE'||ir(p))return null;
@@ -48,7 +51,7 @@ export async function generateDecisions(s:Snapshot,risk:Risk='balanced',now=Date
   if(changed.length&&!base.missing&&current.every(p=>!p||forecast(p).points!==null)&&base.points-total.points>=minimum){
     const gain=rounded(base.points-total.points),involved=[...new Set(changed.flatMap(x=>[x.p,...(x.old?[x.old]:[])]))];
     out.push({id:'lineup:'+s.week,kind:'lineup',title:`Improve your starting lineup by an estimated ${gain} points`,players:involved.map(p=>p.id),gain,horizon:'This week',
-      evidence:[...changed.map(x=>`${x.slot.label}: ${x.old?.name??'empty slot'} → ${x.p.name}.`),...involved.map(evidence)],cautions:[...warnings,...involved.filter(p=>p.status!=='ACTIVE').map(p=>`${p.name} is ${p.status}. Recheck before kickoff.`)],
+      evidence:[...changed.map(x=>`${x.slot.label}: ${x.old?.name??'empty slot'} → ${x.p.name}.`),...involved.map(evidence),...opponentDecisionContext(s)],cautions:[...warnings,...involved.filter(p=>p.status!=='ACTIVE').map(p=>`${p.name} is ${p.status}. Recheck before kickoff.`)],
       moves:base.picks.flatMap((p,i)=>p?[{playerId:p.id,slot:s.slots[i].id}]:[]),expiresAt:expiry(involved),link:teamLink});
   }
   const free=s.players.filter(p=>p.teamId===null&&['FREEAGENT','WAIVERS'].includes(p.availability)&&!isHeld(p,now)&&!unavailable(p)&&forecast(p).points!==null)
@@ -67,6 +70,10 @@ export async function generateDecisions(s:Snapshot,risk:Risk='balanced',now=Date
     if(choice)waivers.push({id:'waiver:'+add.id+':'+(choice.drop?.id??'open'),kind:'waiver',title:`${add.availability==='WAIVERS'?'Claim':'Add'} ${add.name}${choice.drop?'; release '+choice.drop.name:''}`,players:[add.id,...(choice.drop?[choice.drop.id]:[])],gain:choice.gain,horizon:'This week, after optimizing your bench',evidence:[evidence(add),...(choice.drop?[evidence(choice.drop)]:['Your normal roster has an open space.']),scheduleText(add)],cautions:[...warnings,'Waiver priority, position limits, acquisition limits and budget must be confirmed in ESPN.','These are alternatives. Approving one does not make the others compatible.'],moves:[],expiresAt:expiry([add,...(choice.drop?[choice.drop]:[])]),link:teamLink});
   }
   out.push(...waivers.sort((a,b)=>b.gain!-a.gain!).slice(0,2));
+  const contextPlayer=mine.filter(p=>!isHeld(p,now)&&!unavailable(p)).find(p=>{
+    const c=matchupContext(p,s,now);return c?.upcoming&&c.injuryFresh&&(c.out.length>=2||(p.position==='DST'&&c.out.some(i=>i.position==='QB')));
+  });
+  if(contextPlayer)out.push({id:'matchup:'+contextPlayer.id+':'+s.week,kind:'matchup',title:`Review ${contextPlayer.name}’s NFL matchup`,players:[contextPlayer.id],gain:null,horizon:'Before kickoff',evidence:[evidence(contextPlayer),...matchupEvidence(contextPlayer,s,now)],cautions:['This is a matchup review, not a verified scoring upgrade or instruction to start this player.','The opposing injury list may include backups and long-term absences. Confirm starter roles and final inactive reports.','Compare with your current starter and its estimate. No injury-count bonus is added to the projection.'],moves:[],expiresAt:expiry([contextPlayer]),link:teamLink});
   for(const p of mine.filter(ir).slice(0,3)){
     const b=baseline(p),replacement=free.find(x=>x.position===p.position),games=(p.future??[]).slice(0,4),known=games.filter(g=>g.known&&!g.bye).length;
     out.push({id:'ir:'+p.id,kind:'ir',title:p.status==='ACTIVE'?`Review activating ${p.name}`:`Keep ${p.name} in IR for now`,players:[p.id],gain:null,horizon:'Next four weeks',
@@ -94,5 +101,12 @@ export async function generateDecisions(s:Snapshot,risk:Risk='balanced',now=Date
     }
     out.push(...trades.sort((a,b)=>b.gain!-a.gain!).slice(0,2));
   }
-  return Promise.all(out.slice(0,8).map(async d=>({...d,fingerprint:await digest([ADVISOR_VERSION,s.week,risk,d.id,d.title,d.players,d.gain,d.evidence,d.cautions,d.moves])})));
+  return Promise.all(out.slice(0,8).map(async d=>{
+    // Hard per-candidate cap keeps added sources from growing paid prompts.
+    const relevant=d.players.slice(0,2).map(id=>s.players.find(p=>p.id===id)).filter((p):p is LeaguePlayer=>!!p);
+    const context=relevant.flatMap(p=>matchupEvidence(p,s,now)).filter(f=>!d.evidence.includes(f)).slice(0,2);
+    const memory=relevant.flatMap(p=>(s.playerMemory?.[p.id]??[]).slice(0,1).map(text=>`${p.name}, saved history: ${text}`)).slice(0,2);
+    d.evidence.push(...context,...memory);
+    return {...d,fingerprint:await digest([ADVISOR_VERSION,s.week,risk,d.id,d.title,d.players,d.gain,d.evidence,d.cautions,d.moves])};
+  }));
 }

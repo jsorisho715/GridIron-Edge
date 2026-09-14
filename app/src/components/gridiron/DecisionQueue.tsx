@@ -1,5 +1,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {ArrowUpRight,Check,Lightning,ShieldCheck} from '@phosphor-icons/react';
+import type {LeaguePlayer} from '../../lib/football';
+import {PlayerPhoto} from './PlayerPhoto';
 import type {AdvisorData,Decision,DecisionStatus,Risk} from '../../lib/decisions';
 
 async function request(body?:Record<string,unknown>):Promise<AdvisorData>{
@@ -23,14 +25,14 @@ export function useAdvisor(ready:boolean,sourceAt:string|undefined,paused:boolea
   return {data,busy,error,act};
 }
 type Advisor=ReturnType<typeof useAdvisor>;
-export function DecisionQueue({advisor,onSettings}:{advisor:Advisor;onSettings:()=>void}){
+export function DecisionQueue({advisor,onSettings,players=[],onPlayer}:{advisor:Advisor;onSettings:()=>void;players?:LeaguePlayer[];onPlayer?:(p:LeaguePlayer)=>void}){
   const {data,busy,error,act}=advisor,[showHistory,setShowHistory]=useState(false);
   const pending=data?.decisions.filter(d=>!d.status).sort((a,b)=>(a.ai?.priority??5)-(b.ai?.priority??5))??[];
   const approved=data?.decisions.filter(d=>d.status==='approved')??[],history=data?.decisions.filter(d=>d.status==='declined'||d.status==='completed')??[];
   const decide=(d:Decision,status:DecisionStatus)=>void act({action:'decide',id:d.id,fingerprint:d.fingerprint,status,previousStatus:d.status??null});
   const card=(d:Decision,i:number)=><article key={d.id} className={'ga-decision '+(i===0&&!d.status?'ga-priority':'')} aria-label={d.title}>
     <div className="ga-card-top"><span className="ge-eyebrow">{d.kind==='ir'?'INJURED RESERVE':d.kind.toUpperCase()} · {d.horizon}</span><span className="ge-tag">{d.status==='approved'?'APPROVED PLAN':d.status==='completed'?'MARKED DONE':d.status==='declined'?'DECLINED':d.ai?d.ai.verdict==='pursue'?'AI: RECOMMENDED':'AI: WATCH / REVIEW':'STATISTICAL SUGGESTION'}</span></div>
-    <h3>{d.title}</h3>
+    <h3>{d.title}</h3><div className="gi-decision-players">{d.players.slice(0,4).map(id=>players.find(p=>p.id===id)).filter((p):p is LeaguePlayer=>!!p).map(p=><button className="gi-player-chip" key={p.id} onClick={()=>onPlayer?.(p)}><PlayerPhoto player={p}/><span>{p.name}</span></button>)}</div>
     <p className="ga-reason">{d.evidence[d.ai?.evidence[0]??0]}</p>
     <details><summary>Why this recommendation?</summary><ul>{(d.ai?.evidence??d.evidence.map((_,i)=>i)).map(i=><li key={i}>{d.evidence[i]}</li>)}</ul>
       {d.ai&&<p className="ge-footnote">GPT-5.6 Luna selected these reasons from verified inputs. It did not calculate or invent the point estimates.</p>}

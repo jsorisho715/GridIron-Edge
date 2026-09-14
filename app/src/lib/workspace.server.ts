@@ -6,6 +6,9 @@ import { readESPN } from './espn-data.server';
 import { normalizeLeague } from './espn-normalize';
 import { EMPTY_PREFS, type Preferences, type Snapshot, type WorkspaceData, type Alert } from './football';
 import { deliverAlerts, handlePush } from './push.server';
+import { enrichLeague } from './league-intel.server';
+import { activityText, currentOpponent } from './league-intel';
+import { readPlayerMemory, rememberPlayers } from './player-memory.server';
 
 type ConnectionRow={envelope:string;metadata:string;revision:string};
 type HealthRow={last_attempt:number|null;last_success:number|null;next_attempt:number|null;failures:number;error:string|null;heartbeat:number|null;lease_until:number};
@@ -29,7 +32,9 @@ export async function syncWorkspace(env:ConnectionEnv,transport:typeof fetch=fet
   if(scheduled)await env.DB!.prepare('UPDATE ge_sync_health SET heartbeat=? WHERE id=1').bind(now).run();
   if(preferences.paused)return {synced:false,reason:'paused'};
   const saved=await cache(env,row),health=await env.DB!.prepare('SELECT * FROM ge_sync_health WHERE id=1').first<HealthRow>();
-  if((saved&&now-saved.updated_at<120000)||(health?.next_attempt??0)>now)return {synced:false,reason:'cached'};
+  const oldSnapshot:Snapshot|null=saved?JSON.parse(saved.snapshot):null;
+  const needsUpgrade=!!oldSnapshot&&(!oldSnapshot.intel?.nfl||oldSnapshot.playerMemory===undefined);
+  if((saved&&!needsUpgrade&&now-saved.updated_at<120000)||((!needsUpgrade||health?.error)&&(health?.next_attempt??0)>now))return {synced:false,reason:'cached'};
   const lease=randomToken();
   const acquired=await env.DB!.prepare('UPDATE ge_sync_health SET lease_token=?,lease_until=?,last_attempt=? WHERE id=1 AND lease_until<?').bind(lease,now+180000,now,now).run();
   if(!acquired.meta.changes)return {synced:false,reason:'running'};
@@ -70,12 +75,21 @@ export async function syncWorkspace(env:ConnectionEnv,transport:typeof fetch=fet
     if(owned.length&&owned.every(p=>p.projected===null))snapshot.warnings.push('ESPN has not returned current-week projections. Estimates use available completed-game history.');
     if(!owned.length)snapshot.warnings.push('ESPN returned an empty roster. This may be a predraft league.');
     if(owned.some(p=>!p.scheduleKnown))snapshot.warnings.push('Some kickoff times are unknown. Those players are held in their current slots.');
-    const serialized=JSON.stringify(snapshot);if(serialized.length>1500000)throw new SafeError(502,'size','League data exceeded the storage safety limit.');
     const previous:Snapshot|null=saved?JSON.parse(saved.snapshot):null;
+    snapshot.intel=await enrichLeague(snapshot,previous,input,transport,now);
+    snapshot.playerMemory=await rememberPlayers(env,snapshot,previous,row.revision,now);
+    const serialized=JSON.stringify(snapshot);if(serialized.length>1500000)throw new SafeError(502,'size','League data exceeded the storage safety limit.');
     // Conditional commit prevents a slow sync from reviving disconnected or replaced data.
     const commit=await env.DB!.prepare('INSERT INTO ge_workspace_cache(id,connection_revision,snapshot,updated_at) SELECT 1,?,?,? WHERE EXISTS(SELECT 1 FROM ge_espn_connection WHERE id=1 AND revision=?) AND EXISTS(SELECT 1 FROM ge_sync_health WHERE id=1 AND lease_token=?) ON CONFLICT(id) DO UPDATE SET connection_revision=excluded.connection_revision,snapshot=excluded.snapshot,updated_at=excluded.updated_at').bind(row.revision,serialized,now,row.revision,lease).run();
     if(!commit.meta.changes)return {synced:false,reason:'connection_changed'};
     const pendingAlerts:D1PreparedStatement[]=[];
+    const rival=currentOpponent(snapshot);
+    // First import establishes a baseline. Never notify a historical transaction dump.
+    if(previous&&rival){
+      const oldIds=new Set(previous.intel?.activity.map(e=>e.id)??[]);
+      const recent=snapshot.intel.activity.filter(e=>!oldIds.has(e.id)&&e.at>=Date.parse(previous.acquiredAt)&&e.at>now-30*60000&&(e.fromTeamId===rival.id||e.toTeamId===rival.id));
+      if(recent.length)pendingAlerts.push(alertStatement(env,scope,'opponent:'+recent[0].id,'Your opponent has updates',recent.slice(0,3).map(e=>activityText(e,snapshot)).join('. ')+'. Review Opponents for your next step.','opponent'));
+    }
     for(const p of snapshot.players.filter(p=>p.teamId===input.teamId||preferences.watched.includes(p.id))){
       const prior=previous?.players.find(x=>x.id===p.id);
       if((prior&&prior.status!==p.status)||(!prior&&p.status!=='ACTIVE'))pendingAlerts.push(alertStatement(env,scope,'status:'+p.id+':'+p.status+':'+(prior?now:week),p.name+': '+p.status,prior?'Availability changed from '+prior.status+'. Review your lineup in ESPN.':'ESPN reports '+p.status+'. Review before kickoff.','injury',p.id));
@@ -101,7 +115,11 @@ export async function handleWorkspace(request:Request,env:ConnectionEnv,transpor
   try {
     if(missingConfig(env).length)return json({error:'Secure setup is incomplete.',code:'setup'},503);
     if(!await authorized(request,env))return json({error:'Unlock your private workspace.',code:'locked'},401);
-    if(request.method==='GET')return json(await workspaceData(env));
+    if(request.method==='GET'){
+      const data=await workspaceData(env),player=new URL(request.url).searchParams.get('player');
+      if(player!==null){if(!/^\d{1,12}$/.test(player)||!data.snapshot?.players.some(p=>p.id===player))return json({error:'Player is not in your current private workspace.'},404);return json(await readPlayerMemory(env,data.snapshot,player));}
+      return json(data);
+    }
     if(request.method!=='POST')return json({error:'Method not allowed.'},405);
     if(request.headers.get('origin')!==new URL(request.url).origin||request.headers.get('sec-fetch-site')==='cross-site')return json({error:'Open the app directly before making changes.'},403);
     if(request.headers.get('content-type')?.split(';')[0]!=='application/json')return json({error:'Use the app form.'},415);

@@ -1,11 +1,11 @@
 import { boundedText, SafeError } from './espn-security.server';
 import type { ESPNInput } from './espn-provider.server';
-export async function readESPN(input:ESPNInput,resource:'league'|'schedule',params:Record<string,string|string[]>,filter?:unknown,transport:typeof fetch=fetch):Promise<any> {
+export async function readESPN(input:ESPNInput,resource:'league'|'schedule'|'activity',params:Record<string,string|string[]>,filter?:unknown,transport:typeof fetch=fetch):Promise<any> {
   const base='https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/'+input.season;
-  const url=new URL(resource==='league'?base+'/segments/0/leagues/'+input.leagueId:base);
+  const url=new URL(resource==='schedule'?base:base+'/segments/0/leagues/'+input.leagueId+(resource==='activity'?'/communication/':''));
   for(const [key,value] of Object.entries(params))for(const v of Array.isArray(value)?value:[value])url.searchParams.append(key,v);
   const headers:Record<string,string>={Accept:'application/json'};
-  if(resource==='league')headers.Cookie='SWID='+input.swid+'; espn_s2='+input.espnS2;
+  if(resource!=='schedule')headers.Cookie='SWID='+input.swid+'; espn_s2='+input.espnS2;
   if(filter)headers['X-Fantasy-Filter']=JSON.stringify(filter);
   try {
     const response=await transport(url,{headers,redirect:'manual',signal:AbortSignal.timeout(15000)});

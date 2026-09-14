@@ -5,23 +5,47 @@ import {handleWorkspace,syncWorkspace,workspaceData} from '../src/lib/workspace.
 import {encryptConnection,randomToken,type ConnectionEnv} from '../src/lib/espn-security.server';
 import {input,leagueFixture} from './fixtures/live';
 import {validateSubscription} from '../src/lib/push.server';
+import {rememberPlayers,readPlayerMemory} from '../src/lib/player-memory.server';
+import {normalizeLeague} from '../src/lib/espn-normalize';
 const base='https://app.test';
-async function fixture(){const db=new Database(':memory:');for(const f of ['0002_secure_espn.sql','0003_live_workspace.sql'])db.exec(await Bun.file(new URL('../migrations/'+f,import.meta.url)).text());
+async function fixture(){const db=new Database(':memory:');for(const f of ['0002_secure_espn.sql','0003_live_workspace.sql','0005_player_memory.sql'])db.exec(await Bun.file(new URL('../migrations/'+f,import.meta.url)).text());
   const env:ConnectionEnv={OWNER_ACCESS_KEY:randomToken(),CREDENTIAL_ENCRYPTION_KEY:randomToken(),DB:{async batch(statements:any[]){return Promise.all(statements.map(s=>s.run()));},prepare(sql:string){let args:any[]=[];return{bind(...values:any[]){args=values;return this;},async first(){return db.query(sql).get(...args)??null;},async all(){return{results:db.query(sql).all(...args),success:true};},async run(){return{success:true,meta:{changes:db.query(sql).run(...args).changes}};}};}} as unknown as ConnectionEnv['DB']};
   await env.DB!.prepare('INSERT INTO ge_espn_connection VALUES(1,?,?,?)').bind(await encryptConnection(env.CREDENTIAL_ENCRYPTION_KEY!,input),JSON.stringify({leagueId:10309566,teamId:25,season:2026}),randomToken()).run();
   const request=(body?:unknown,cookie='',headers={})=>new Request(base+'/api/gridiron/workspace',{method:body?'POST':'GET',headers:{origin:base,'content-type':'application/json',cookie,...headers},body:body?JSON.stringify(body):undefined});
   const login=await handleConnection(new Request(base+'/api/gridiron/connection',{method:'POST',headers:{origin:base,'content-type':'application/json'},body:JSON.stringify({action:'login',ownerKey:env.OWNER_ACCESS_KEY})}),env);
   const cookie=login.headers.get('set-cookie')!.split(';')[0],calls:string[]=[],f=leagueFixture();
   let failure=false;
-  const transport=(async(url:RequestInfo|URL,options?:RequestInit)=>{const u=new URL(String(url));calls.push(u.href);expect(options?.redirect).toBe('manual');if(failure)return new Response(null,{status:401});const views=u.searchParams.getAll('view');return Response.json(views.includes('proTeamSchedules_wl')?f.schedule:views.includes('kona_playercard')?f.cards:views.includes('kona_player_info')?f.free:f.core);}) as typeof fetch;
+  const transport=(async(url:RequestInfo|URL,options?:RequestInit)=>{const u=new URL(String(url));calls.push(u.href);expect(options?.redirect).toBe('manual');if(failure)return new Response(null,{status:401});if(u.hostname==='site.api.espn.com'){expect(new Headers(options?.headers).has('Cookie')).toBe(false);return Response.json(u.pathname.endsWith('news')?{articles:[]}:u.pathname.endsWith('injuries')?{injuries:[]}:{events:[]});}if(u.pathname.endsWith('/communication/'))return Response.json({topics:[]});const views=u.searchParams.getAll('view');return Response.json(views.includes('proTeamSchedules_wl')?f.schedule:views.includes('kona_playercard')?f.cards:views.includes('kona_player_info')?f.free:f.core);}) as typeof fetch;
   return{db,env,request,cookie,calls,transport,fail:()=>{failure=true;}};
 }
 test('private workspace rejects unauthenticated reads, writes and cross-origin mutations',async()=>{const f=await fixture();expect((await handleWorkspace(f.request(),f.env)).status).toBe(401);expect((await handleWorkspace(f.request({action:'sync'}),f.env)).status).toBe(401);expect((await handleWorkspace(f.request({action:'sync'},f.cookie,{origin:'https://evil.test'}),f.env)).status).toBe(403);expect(f.calls).toHaveLength(0);});
-test('first sync imports data, caches requests, strips credentials, and preserves last good data on failure',async()=>{const f=await fixture();expect((await syncWorkspace(f.env,f.transport)).synced).toBe(true);expect(f.calls).toHaveLength(5);const data=await workspaceData(f.env);expect(data.snapshot?.teamId).toBe(25);expect(JSON.stringify(data)).not.toContain(input.espnS2);expect(JSON.stringify(data)).not.toContain(input.swid);expect((await syncWorkspace(f.env,f.transport)).reason).toBe('cached');expect(f.calls).toHaveLength(5);
+test('first sync imports data, caches requests, strips credentials, and preserves last good data on failure',async()=>{const f=await fixture();expect((await syncWorkspace(f.env,f.transport)).synced).toBe(true);expect(f.calls).toHaveLength(9);const data=await workspaceData(f.env);expect(data.snapshot?.teamId).toBe(25);expect(JSON.stringify(data)).not.toContain(input.espnS2);expect(JSON.stringify(data)).not.toContain(input.swid);expect((await syncWorkspace(f.env,f.transport)).reason).toBe('cached');expect(f.calls).toHaveLength(9);
   f.db.exec('UPDATE ge_workspace_cache SET updated_at=0; UPDATE ge_sync_health SET next_attempt=0');f.fail();expect((await syncWorkspace(f.env,f.transport)).reason).toBe('error');const after=await workspaceData(f.env);expect(after.snapshot).toEqual(data.snapshot);expect(after.health.error).toContain('cookies');expect(after.health.nextAttempt).toBeGreaterThan(Date.now());});
 test('sync uses an atomic lease and cannot publish data after credentials are disconnected',async()=>{const f=await fixture();f.db.exec('UPDATE ge_sync_health SET lease_until='+String(Date.now()+120000));expect((await syncWorkspace(f.env,f.transport)).reason).toBe('running');expect(f.calls).toHaveLength(0);f.db.exec('UPDATE ge_sync_health SET lease_until=0');const transport=(async(...args:Parameters<typeof fetch>)=>{const result=await f.transport(...args);if(String(args[0]).includes('kona_playercard'))f.db.exec('DELETE FROM ge_espn_connection');return result;}) as typeof fetch;expect((await syncWorkspace(f.env,transport)).reason).toBe('connection_changed');expect((await workspaceData(f.env)).snapshot).toBeNull();});
 test('notes and watchlists persist privately and reject concurrent overwrites',async()=>{const f=await fixture();const r=await handleWorkspace(f.request({action:'preferences',updatedAt:0,notes:'Private game plan',watched:['2500']},f.cookie),f.env);expect(r.status).toBe(200);expect((await workspaceData(f.env)).preferences.notes).toBe('Private game plan');expect((await handleWorkspace(f.request({action:'preferences',updatedAt:0,notes:'Stale overwrite'},f.cookie),f.env)).status).toBe(409);expect((await workspaceData(f.env)).preferences.notes).toBe('Private game plan');});
 test('paused monitoring makes no ESPN calls and exposes a scheduler heartbeat',async()=>{const f=await fixture();await handleWorkspace(f.request({action:'preferences',updatedAt:0,paused:true},f.cookie),f.env);expect((await syncWorkspace(f.env,f.transport,true)).reason).toBe('paused');expect(f.calls).toHaveLength(0);expect((await workspaceData(f.env)).health.heartbeat).toBeGreaterThan(0);});
+test('player memory persists meaningful changes without duplicating unchanged refreshes and remains private',async()=>{
+  const f=await fixture();await syncWorkspace(f.env,f.transport);const s=(await workspaceData(f.env)).snapshot!;
+  const revision=(f.db.query('SELECT revision FROM ge_espn_connection').get() as any).revision;
+  const before=await readPlayerMemory(f.env,s,s.players[0].id),copy=structuredClone(s);copy.players[0].status='OUT';
+  copy.playerMemory=await rememberPlayers(f.env,copy,s,revision,Date.now()+1000);
+  const after=await readPlayerMemory(f.env,copy,s.players[0].id);expect(after.events.length).toBe(before.events.length+1);expect(after.events[0].summary).toContain('ACTIVE to OUT');
+  expect(copy.playerMemory[s.players[0].id][0]).toContain('ACTIVE to OUT');
+  await rememberPlayers(f.env,copy,copy,revision,Date.now()+2000);expect((await readPlayerMemory(f.env,copy,s.players[0].id)).events).toHaveLength(after.events.length);
+  const path=base+'/api/gridiron/workspace?player='+s.players[0].id;
+  expect((await handleWorkspace(new Request(path),f.env)).status).toBe(401);
+  expect((await handleWorkspace(new Request(path,{headers:{cookie:f.cookie}}),f.env)).status).toBe(200);
+  expect((await handleWorkspace(new Request(base+'/api/gridiron/workspace?player=99999999',{headers:{cookie:f.cookie}}),f.env)).status).toBe(404);
+});
+test('prediction memory freezes at kickoff and settles real outcomes including scoring corrections',async()=>{
+  const f=await fixture(),raw=leagueFixture(),time=Date.UTC(2026,8,14,12),s=normalizeLeague(raw.core,raw.cards,raw.free,raw.schedule,input,time);
+  s.players=s.players.slice(0,1);const p=s.players[0],revision=(f.db.query('SELECT revision FROM ge_espn_connection').get() as any).revision;
+  await rememberPlayers(f.env,s,null,revision,time);const first=(await readPlayerMemory(f.env,s,p.id)).forecasts[0];expect(first.forecast_at).toBeLessThan(first.kickoff);
+  const next=structuredClone(s);next.week=3;next.players[0].projected=999;next.players[0].history.push({season:2026,week:2,points:17,projected:null});
+  await rememberPlayers(f.env,next,s,revision,time+2*86400000);let saved=(await readPlayerMemory(f.env,next,p.id)).forecasts;
+  expect(saved).toHaveLength(1);expect(saved[0].estimate).toBe(first.estimate);expect(saved[0].actual).toBe(17);
+  next.players[0].history.at(-1)!.points=18;await rememberPlayers(f.env,next,next,revision,time+3*86400000);saved=(await readPlayerMemory(f.env,next,p.id)).forecasts;expect(saved[0].actual).toBe(18);expect(saved[0].forecast_at).toBe(first.forecast_at);
+});
 test('push registration encrypts endpoints and delivers an encrypted test only to an allowed service',async()=>{
   const f=await fixture(),pair=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
   const b64=(bytes:Uint8Array)=>btoa(String.fromCharCode(...bytes)).replaceAll('+','-').replaceAll('/','_').replaceAll('=','');

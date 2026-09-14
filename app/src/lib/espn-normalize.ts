@@ -1,5 +1,7 @@
 import type { GameLog, LeaguePlayer, Slot, Snapshot } from './football';
 import type { ESPNInput } from './espn-provider.server';
+import { normalizeManagers } from './league-intel';
+import { normalizeUsage } from './player-usage';
 // Boundary-only representation. All data leaving this module is normalized.
 type Raw=Record<string,any>;
 const obj=(v:unknown):Raw=>v&&typeof v==='object'&&!Array.isArray(v)?v as Raw:{};
@@ -28,7 +30,7 @@ export function normalizeLeague(core:unknown, cards:unknown, free:unknown, sched
     for(const stat of statRows){if(stat.statSourceId!==0||stat.statSplitTypeId===2||!Number.isInteger(stat.scoringPeriodId)||stat.scoringPeriodId<1||stat.scoringPeriodId>18||stat.seasonId>input.season||(stat.seasonId===input.season&&stat.scoringPeriodId>=week)||stat.seasonId<input.season-1||maybe(stat.appliedTotal)===null)continue;
       // Exclude explicitly empty inactive/bye rows, retain real zero-point games.
       if(stat.stats&&Object.keys(obj(stat.stats)).length===0)continue;
-      if(!history.some(g=>g.season===stat.seasonId&&g.week===stat.scoringPeriodId))history.push({season:stat.seasonId,week:stat.scoringPeriodId,points:stat.appliedTotal,projected:maybe(statFor(stat.seasonId,stat.scoringPeriodId,1)?.appliedTotal)});
+      if(!history.some(g=>g.season===stat.seasonId&&g.week===stat.scoringPeriodId))history.push({season:stat.seasonId,week:stat.scoringPeriodId,points:stat.appliedTotal,projected:maybe(statFor(stat.seasonId,stat.scoringPeriodId,1)?.appliedTotal),usage:normalizeUsage(stat.stats)});
     }
     history.sort((a,b)=>a.season-b.season||a.week-b.week);
     const proTeamId=num(p.proTeamId),pro=proTeams.find(t=>t.id===proTeamId),games=arr(obj(pro?.proGamesByScoringPeriod)[String(week)]),game=games[0];
@@ -38,7 +40,7 @@ export function normalizeLeague(core:unknown, cards:unknown, free:unknown, sched
     return {id,name:name(p.fullName,'Player '+id),position:POS[num(p.defaultPositionId)]??SLOT_NAMES[eligible.find((s:number)=>![20,21,23,24,25].includes(s))]??'OTHER',proTeam:PRO[proTeamId]??'NFL',proTeamId,teamId,slot,slotId,eligible,
       status:name(p.injuryStatus,p.injured?'UNKNOWN':'ACTIVE').toUpperCase(),availability:teamId!==null?'ROSTERED':name(pool.status,'UNKNOWN'),owned:maybe(p.ownership?.percentOwned),
       droppable:p.droppable===true,locked:!scheduleKnown||(!bye&&date!==null&&date<=now),kickoff,opponent:game?PRO[game.homeProTeamId===proTeamId?game.awayProTeamId:game.homeProTeamId]??null:null,bye,scheduleKnown,
-      projected:maybe(statFor(input.season,week,1)?.appliedTotal),actual:maybe(statFor(input.season,week,0)?.appliedTotal),history:history.slice(-32),
+      projected:maybe(statFor(input.season,week,1)?.appliedTotal),actual:maybe(statFor(input.season,week,0)?.appliedTotal),history:history.slice(-32),opponentProTeamId:game?maybe(game.homeProTeamId===proTeamId?game.awayProTeamId:game.homeProTeamId):null,
       future:Array.from({length:Math.max(0,Math.min(6,19-week))},(_,i)=>{const w=week+i,g=arr(obj(pro?.proGamesByScoringPeriod)[String(w)])[0],d=maybe(g?.date),bye=pro?.byeWeek===w;return {week:w,opponent:g?PRO[g.homeProTeamId===proTeamId?g.awayProTeamId:g.homeProTeamId]??null:null,kickoff:d===null?null:new Date(d).toISOString(),bye,known:bye||!!g,projected:maybe(statFor(input.season,w,1)?.appliedTotal)};})};
   };
   for(const team of arr(raw.teams)){const used:Record<string,number>={};for(const entry of arr(team.roster?.entries)){const id=num(entry.lineupSlotId,20),index=used[id]??0;used[id]=index+1;const slot=slots.find(s=>s.id===id+':'+index)?.id??(id===21||id===24?'IR':'BE');const p=normalize(entry,num(team.id),slot,id);if(p)players.push(p);}}
@@ -47,7 +49,7 @@ export function normalizeLeague(core:unknown, cards:unknown, free:unknown, sched
   for(const entry of arr(obj(cards).players).slice(0,120)){
     const team=num(entry.onTeamId),p=normalize(entry,team>0?team:null,null,null);if(p)players.push(p);
   }
-  const teams=arr(raw.teams).map(t=>({id:num(t.id),name:name(t.name,[t.location,t.nickname].filter(Boolean).join(' ')||'Team '+t.id),wins:num(t.record?.overall?.wins),losses:num(t.record?.overall?.losses),ties:num(t.record?.overall?.ties),pointsFor:num(t.record?.overall?.pointsFor),pointsAgainst:num(t.record?.overall?.pointsAgainst),rank:maybe(t.rankCalculatedFinal??t.playoffSeed)}));
+  const teams=arr(raw.teams).map(t=>({id:num(t.id),name:name(t.name,[t.location,t.nickname].filter(Boolean).join(' ')||'Team '+t.id),managers:normalizeManagers(t.owners,raw.members),wins:num(t.record?.overall?.wins),losses:num(t.record?.overall?.losses),ties:num(t.record?.overall?.ties),pointsFor:num(t.record?.overall?.pointsFor),pointsAgainst:num(t.record?.overall?.pointsAgainst),rank:maybe(t.rankCalculatedFinal??t.playoffSeed)}));
   const matchups=arr(raw.schedule).map(m=>{const periods=obj(settings.scheduleSettings?.matchupPeriods)[String(m.matchupPeriodId)],weeks=Array.isArray(periods)?periods:[m.matchupPeriodId];return {homeId:num(m.home?.teamId),awayId:maybe(m.away?.teamId),homeScore:maybe(m.home?.totalPoints),awayScore:maybe(m.away?.totalPoints),week:num(weeks[0]),endWeek:num(weeks[weeks.length-1])};}).filter(m=>m.homeId>0);
   const scoringRules=arr(settings.scoringSettings?.scoringItems).map(r=>({id:num(r.statId),points:num(r.points)})),ppr=scoringRules.find(r=>r.id===53)?.points??0;
   const scoring=(ppr===1?'PPR':ppr===.5?'Half PPR':ppr===0?'No reception points':'Custom reception scoring')+' · ESPN league rules';

@@ -10,7 +10,7 @@ import {input,leagueFixture} from './fixtures/live';
 const origin='https://app.test',key='sk-'+('synthetic_key_'.repeat(4));
 function snapshot(){const f=leagueFixture(),now=Date.now();const s=normalizeLeague(f.core,f.cards,f.free,f.schedule,input,now);s.players=s.players.map(p=>({...p,locked:false,kickoff:new Date(now+86400000).toISOString(),future:Array.from({length:4},(_,i)=>({week:2+i,opponent:'TEN',kickoff:new Date(now+(1+i*7)*86400000).toISOString(),bye:false,known:true,projected:null}))}));return s;}
 async function fixture(){
-  const db=new Database(':memory:');for(const f of ['0002_secure_espn.sql','0003_live_workspace.sql','0004_decision_advisor.sql'])db.exec(await Bun.file(new URL('../migrations/'+f,import.meta.url)).text());
+  const db=new Database(':memory:');for(const f of ['0002_secure_espn.sql','0003_live_workspace.sql','0004_decision_advisor.sql','0005_player_memory.sql'])db.exec(await Bun.file(new URL('../migrations/'+f,import.meta.url)).text());
   const env:ConnectionEnv={OWNER_ACCESS_KEY:randomToken(),CREDENTIAL_ENCRYPTION_KEY:randomToken(),DB:{async batch(statements:any[]){return Promise.all(statements.map(s=>s.run()));},prepare(sql:string){let args:any[]=[];return{bind(...values:any[]){args=values;return this;},async first(){return db.query(sql).get(...args)??null;},async all(){return{results:db.query(sql).all(...args),success:true};},async run(){return{success:true,meta:{changes:db.query(sql).run(...args).changes}};}};}} as unknown as ConnectionEnv['DB']};
   await env.DB!.prepare('INSERT INTO ge_espn_connection VALUES(1,?,?,?)').bind(await encryptConnection(env.CREDENTIAL_ENCRYPTION_KEY!,input),JSON.stringify({leagueId:input.leagueId,teamId:25,season:2026}),'revision').run();
   const s=snapshot();const save=(s:Snapshot)=>db.query('INSERT OR REPLACE INTO ge_workspace_cache VALUES(1,?,?,?)').run('revision',JSON.stringify(s),Date.now());save(s);
@@ -57,6 +57,7 @@ test('AI reviews are bounded, grounded, cached across refreshes and approvals, w
   const d=data.decisions[0];const r=await handleAdvisor(f.request({action:'decide',id:d.id,fingerprint:d.fingerprint,status:'approved',previousStatus:null}),f.env);expect(r.status).toBe(200);
   f.db.exec('UPDATE ge_advisor_config SET last_attempt=0');await reviewAdvisor(f.env,f.transport);expect(f.paid()).toBe(1);data=await advisorData(f.env);expect(data.decisions[0].status).toBe('approved');expect(data.reviewedAt).not.toBeNull();
   expect((await handleAdvisor(f.request({action:'decide',id:d.id,fingerprint:d.fingerprint,status:'declined',previousStatus:null}),f.env)).status).toBe(409);
+  expect(f.db.query("SELECT COUNT(*) AS n FROM ge_player_memory WHERE kind='decision'").get()).toEqual({n:d.players.length});
 });
 test('stale data, paused monitoring and changed evidence cannot be approved or trigger paid review',async()=>{
   const f=await fixture();await f.enable();const d=(await advisorData(f.env)).decisions[0];f.s.acquiredAt=new Date(Date.now()-3600000).toISOString();f.save(f.s);
@@ -69,4 +70,10 @@ test('invalid model output and redirects preserve statistical advice and cannot 
 });
 test('strict review validation rejects invented IDs and fabricated evidence indexes',async()=>{
   const ds=(await generateDecisions(snapshot())).slice(0,1);expect(()=>validateReview({decisions:[{id:ds[0].id,verdict:'pursue',priority:1,evidence:[999],cautions:[0]}]},ds)).toThrow();expect(reviewRequest(ds,'balanced').text.format.strict).toBe(true);
+});
+test('shared facts reduce repeated AI input while preserving each candidate’s local evidence order',async()=>{
+  const ds=await generateDecisions(snapshot()),request=reviewRequest(ds,'balanced'),input=JSON.parse(request.input);
+  expect(input.facts.length).toBeLessThan(ds.reduce((n,d)=>n+d.evidence.length+d.cautions.length,0));
+  for(let i=0;i<ds.length;i++){expect(input.candidates[i].evidence.map((j:number)=>input.facts[j])).toEqual(ds[i].evidence);expect(input.candidates[i].cautions.map((j:number)=>input.facts[j])).toEqual(ds[i].cautions);}
+  expect(new TextEncoder().encode(JSON.stringify(request)).length).toBeLessThan(18000);
 });
