@@ -1,7 +1,6 @@
-declare const __HF_DESIGN_INSPECTOR__: boolean;
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Outlet, createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import css from "../styles.css?url";
 import custom from "../gridiron.css?url";
 import meta from "../app-meta.json";
@@ -69,12 +68,6 @@ function Shell({ children }: { children: ReactNode }) {
 }
 function Root() {
   const { queryClient } = Route.useRouteContext();
-  useEffect(() => {
-    if (!__HF_DESIGN_INSPECTOR__ || window.location.pathname.startsWith("/connections")) return;
-    void import("../module/design-inspector/runtime")
-      .then(({ installHiggsfieldDesignInspector }) => installHiggsfieldDesignInspector())
-      .catch(() => {});
-  }, []);
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />

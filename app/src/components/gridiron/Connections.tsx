@@ -87,7 +87,7 @@ function SetupKeys() {
     <details className="ge-key-helper">
       <summary>One-time hosting setup</summary>
       <ol>
-        <li>Open this website in your Higgsfield dashboard, then open its secret settings.</li>
+        <li>Open this repository’s GitHub Actions secrets settings.</li>
         <li>Create the two named secrets below. Keep a private copy in your password manager.</li>
         <li>Deploy the website again to activate the secrets, then refresh this page.</li>
       </ol>
@@ -144,8 +144,8 @@ function SetupKeys() {
         {notice ||
           "Keys are not sent anywhere by this helper. They disappear when you leave this page."}
       </p>
-      <a className="ge-link" href="https://higgsfield.ai" target="_blank" rel="noreferrer">
-        Open Higgsfield
+      <a className="ge-link" href="https://github.com/jsorisho715/GridIron-Edge/settings/secrets/actions" target="_blank" rel="noreferrer">
+        Open GitHub secrets
         <ArrowUpRight size={18} />
       </a>
     </details>
@@ -583,11 +583,12 @@ export function Connections() {
                   </div>
                 )}
                 <div className="ge-connect-alert">
-                  <strong>Connection ready. Live dashboard still pending.</strong>
+                  <strong>Your league is ready to sync.</strong>
                   <p>
-                    This screen verifies and stores access. The workspace still shows fictional
-                    sample data; continuous sync, injury monitoring and alerts are not running.
+                    Open your workspace to import the league. Automatic monitoring checks for
+                    updates every 15 minutes. Enable notifications in Settings on each device.
                   </p>
+                  <a className="ge-button ge-full" href="/app">Open my live workspace</a>
                 </div>
               </>
             )}

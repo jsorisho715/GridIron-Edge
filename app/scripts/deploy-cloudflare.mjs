@@ -49,6 +49,7 @@ async function main() {
     name, account_id: account, main: resolve("dist/server/server.js"),
     compatibility_date: "2026-09-14", compatibility_flags: ["nodejs_compat"],
     workers_dev: true, preview_urls: false, send_metrics: false,
+    triggers: { crons: ["*/15 * * * *"] },
     assets: { directory: resolve("dist/client"), binding: "ASSETS", not_found_handling: "none" },
     vars: { APP_SLUG: name, HF_ENV: process.env.HF_ENV || "production" },
     d1_databases: [{ binding: "DB", database_name: name + "-db", database_id: db.uuid, migrations_dir: resolve("migrations") }],
@@ -88,7 +89,42 @@ async function main() {
   check(healthy, "Worker deployed but secure setup readiness failed. Check bindings and migrations.");
   const html = await fetch(origin + "/connections", { redirect: "error", signal: AbortSignal.timeout(15000) });
   check(html.ok && (await html.text()).includes("Secure connections"), "Connection screen smoke check failed.");
-  console.log("Deployment verified: " + origin + "/connections");
-  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, "## Gridiron Edge\n\n[Open secure connections](" + origin + "/connections)\n\nOwner access and encrypted storage are configured. Dashboard data remains sample data.\n");
+  const privateStatus = await fetch(origin + "/api/gridiron/workspace", { redirect: "error", signal: AbortSignal.timeout(15000) });
+  check(privateStatus.status === 401, "Private workspace must reject unauthenticated reads.");
+  let cookie;
+  const privateCall = async (path, body) => {
+    const response = await fetch(origin + path, {
+      method: body ? "POST" : "GET", redirect: "error", signal: AbortSignal.timeout(120000),
+      headers: { Origin: origin, ...(body ? { "Content-Type": "application/json" } : {}), ...(cookie ? { Cookie: cookie } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    check(response.ok, "Private deployment check returned HTTP " + response.status + ".");
+    return response;
+  };
+  try {
+    const login = await privateCall("/api/gridiron/connection", { action: "login", ownerKey: owner });
+    cookie = login.headers.get("set-cookie")?.split(";")[0];
+    check(cookie, "Private deployment check could not establish an owner session.");
+    let workspace = await (await privateCall("/api/gridiron/workspace")).json();
+    if (workspace.connected) {
+      if (!workspace.preferences.paused) {
+        const sync = await (await privateCall("/api/gridiron/workspace", { action: "sync" })).json();
+        workspace = sync.workspace;
+        check(!sync.error, "Live league import failed: " + (sync.error || "unknown"));
+        check(workspace.snapshot, "Live league import produced no snapshot.");
+      }
+      if (workspace.snapshot) {
+        const s = workspace.snapshot, mine = s.players.filter(p => p.teamId === s.teamId);
+        check(s.leagueId === 10309566 && s.teamId === 25 && s.slots.length > 0, "Imported league identity or slots did not match this private app.");
+        check(!JSON.stringify(workspace).includes('"espnS2"') && !JSON.stringify(workspace).includes('"envelope"'), "Private API exposed a credential field.");
+        console.log("Live league verified: " + JSON.stringify({ teams: s.teams.length, roster: mine.length, slots: s.slots.length, pool: s.players.length, withHistory: mine.filter(p => p.history.length).length, withSchedule: mine.filter(p => p.scheduleKnown).length, withProjection: mine.filter(p => p.projected !== null).length, warnings: s.warnings }));
+      }
+    } else console.log("No ESPN connection saved; secure first-run screen verified.");
+  } finally {
+    if (cookie) await privateCall("/api/gridiron/connection", { action: "logout" });
+    cookie = undefined;
+  }
+  console.log("Deployment verified: " + origin + "/app");
+  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, "## Gridiron Edge\n\n[Open private workspace](" + origin + "/app)\n\nOwner access, live league import and scheduled monitoring are configured. Enable notifications on each device to receive alerts.\n");
 }
 main().catch(e => { console.error("Deployment stopped: " + e.message); process.exitCode = 1; });

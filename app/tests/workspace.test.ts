@@ -1,0 +1,38 @@
+import {expect,test} from 'bun:test';
+import {Database} from 'bun:sqlite';
+import {handleConnection} from '../src/lib/espn-connection.server';
+import {handleWorkspace,syncWorkspace,workspaceData} from '../src/lib/workspace.server';
+import {encryptConnection,randomToken,type ConnectionEnv} from '../src/lib/espn-security.server';
+import {input,leagueFixture} from './fixtures/live';
+import {validateSubscription} from '../src/lib/push.server';
+const base='https://app.test';
+async function fixture(){const db=new Database(':memory:');for(const f of ['0002_secure_espn.sql','0003_live_workspace.sql'])db.exec(await Bun.file(new URL('../migrations/'+f,import.meta.url)).text());
+  const env:ConnectionEnv={OWNER_ACCESS_KEY:randomToken(),CREDENTIAL_ENCRYPTION_KEY:randomToken(),DB:{async batch(statements:any[]){return Promise.all(statements.map(s=>s.run()));},prepare(sql:string){let args:any[]=[];return{bind(...values:any[]){args=values;return this;},async first(){return db.query(sql).get(...args)??null;},async all(){return{results:db.query(sql).all(...args),success:true};},async run(){return{success:true,meta:{changes:db.query(sql).run(...args).changes}};}};}} as unknown as ConnectionEnv['DB']};
+  await env.DB!.prepare('INSERT INTO ge_espn_connection VALUES(1,?,?,?)').bind(await encryptConnection(env.CREDENTIAL_ENCRYPTION_KEY!,input),JSON.stringify({leagueId:10309566,teamId:25,season:2026}),randomToken()).run();
+  const request=(body?:unknown,cookie='',headers={})=>new Request(base+'/api/gridiron/workspace',{method:body?'POST':'GET',headers:{origin:base,'content-type':'application/json',cookie,...headers},body:body?JSON.stringify(body):undefined});
+  const login=await handleConnection(new Request(base+'/api/gridiron/connection',{method:'POST',headers:{origin:base,'content-type':'application/json'},body:JSON.stringify({action:'login',ownerKey:env.OWNER_ACCESS_KEY})}),env);
+  const cookie=login.headers.get('set-cookie')!.split(';')[0],calls:string[]=[],f=leagueFixture();
+  let failure=false;
+  const transport=(async(url:RequestInfo|URL,options?:RequestInit)=>{const u=new URL(String(url));calls.push(u.href);expect(options?.redirect).toBe('manual');if(failure)return new Response(null,{status:401});const views=u.searchParams.getAll('view');return Response.json(views.includes('proTeamSchedules_wl')?f.schedule:views.includes('kona_playercard')?f.cards:views.includes('kona_player_info')?f.free:f.core);}) as typeof fetch;
+  return{db,env,request,cookie,calls,transport,fail:()=>{failure=true;}};
+}
+test('private workspace rejects unauthenticated reads, writes and cross-origin mutations',async()=>{const f=await fixture();expect((await handleWorkspace(f.request(),f.env)).status).toBe(401);expect((await handleWorkspace(f.request({action:'sync'}),f.env)).status).toBe(401);expect((await handleWorkspace(f.request({action:'sync'},f.cookie,{origin:'https://evil.test'}),f.env)).status).toBe(403);expect(f.calls).toHaveLength(0);});
+test('first sync imports data, caches requests, strips credentials, and preserves last good data on failure',async()=>{const f=await fixture();expect((await syncWorkspace(f.env,f.transport)).synced).toBe(true);expect(f.calls).toHaveLength(4);const data=await workspaceData(f.env);expect(data.snapshot?.teamId).toBe(25);expect(JSON.stringify(data)).not.toContain(input.espnS2);expect(JSON.stringify(data)).not.toContain(input.swid);expect((await syncWorkspace(f.env,f.transport)).reason).toBe('cached');expect(f.calls).toHaveLength(4);
+  f.db.exec('UPDATE ge_workspace_cache SET updated_at=0; UPDATE ge_sync_health SET next_attempt=0');f.fail();expect((await syncWorkspace(f.env,f.transport)).reason).toBe('error');const after=await workspaceData(f.env);expect(after.snapshot).toEqual(data.snapshot);expect(after.health.error).toContain('cookies');expect(after.health.nextAttempt).toBeGreaterThan(Date.now());});
+test('sync uses an atomic lease and cannot publish data after credentials are disconnected',async()=>{const f=await fixture();f.db.exec('UPDATE ge_sync_health SET lease_until='+String(Date.now()+120000));expect((await syncWorkspace(f.env,f.transport)).reason).toBe('running');expect(f.calls).toHaveLength(0);f.db.exec('UPDATE ge_sync_health SET lease_until=0');const transport=(async(...args:Parameters<typeof fetch>)=>{const result=await f.transport(...args);if(String(args[0]).includes('kona_playercard'))f.db.exec('DELETE FROM ge_espn_connection');return result;}) as typeof fetch;expect((await syncWorkspace(f.env,transport)).reason).toBe('connection_changed');expect((await workspaceData(f.env)).snapshot).toBeNull();});
+test('notes and watchlists persist privately and reject concurrent overwrites',async()=>{const f=await fixture();const r=await handleWorkspace(f.request({action:'preferences',updatedAt:0,notes:'Private game plan',watched:['2500']},f.cookie),f.env);expect(r.status).toBe(200);expect((await workspaceData(f.env)).preferences.notes).toBe('Private game plan');expect((await handleWorkspace(f.request({action:'preferences',updatedAt:0,notes:'Stale overwrite'},f.cookie),f.env)).status).toBe(409);expect((await workspaceData(f.env)).preferences.notes).toBe('Private game plan');});
+test('paused monitoring makes no ESPN calls and exposes a scheduler heartbeat',async()=>{const f=await fixture();await handleWorkspace(f.request({action:'preferences',updatedAt:0,paused:true},f.cookie),f.env);expect((await syncWorkspace(f.env,f.transport,true)).reason).toBe('paused');expect(f.calls).toHaveLength(0);expect((await workspaceData(f.env)).health.heartbeat).toBeGreaterThan(0);});
+test('push registration encrypts endpoints and delivers an encrypted test only to an allowed service',async()=>{
+  const f=await fixture(),pair=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);
+  const b64=(bytes:Uint8Array)=>btoa(String.fromCharCode(...bytes)).replaceAll('+','-').replaceAll('/','_').replaceAll('=','');
+  const subscription={endpoint:'https://fcm.googleapis.com/fcm/send/synthetic-endpoint',expirationTime:null,keys:{p256dh:b64(new Uint8Array(await crypto.subtle.exportKey('raw',pair.publicKey))),auth:b64(crypto.getRandomValues(new Uint8Array(16)))}};
+  expect(()=>validateSubscription({...subscription,endpoint:'https://127.0.0.1/private'})).toThrow();
+  expect(()=>validateSubscription({...subscription,endpoint:'https://fcm.googleapis.com.evil.example/private'})).toThrow();
+  const config=await handleWorkspace(f.request({action:'push_config'},f.cookie),f.env);expect(config.status).toBe(200);expect(await config.json()).toHaveProperty('publicKey');
+  const registered=await handleWorkspace(f.request({action:'push_subscribe',subscription},f.cookie),f.env);expect(registered.status).toBe(200);
+  expect(JSON.stringify(f.db.query('SELECT * FROM ge_push_subscriptions').all())).not.toContain(subscription.endpoint);
+  expect(JSON.stringify(f.db.query('SELECT * FROM ge_push_config').all())).not.toContain('privateKey');
+  let calls=0;const transport=(async(url:RequestInfo|URL,options?:RequestInit)=>{calls++;expect(String(url)).toBe(subscription.endpoint);expect(options?.redirect).toBe('manual');expect(new Headers(options?.headers).get('content-encoding')).toBe('aes128gcm');expect(new Headers(options?.headers).get('authorization')).toContain('vapid');return new Response(null,{status:201});}) as typeof fetch;
+  const sent=await handleWorkspace(f.request({action:'push_test',endpoint:subscription.endpoint},f.cookie),f.env,transport);expect(sent.status).toBe(200);expect(calls).toBe(1);
+  expect((await handleWorkspace(f.request({action:'push_unsubscribe',endpoint:subscription.endpoint},f.cookie),f.env)).status).toBe(200);expect(f.db.query('SELECT * FROM ge_push_subscriptions').all()).toHaveLength(0);
+});

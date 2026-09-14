@@ -1,62 +1,48 @@
 # Gridiron Edge checkpoint
 
-Read this file first. Do not reconstruct completed work from chat.
+Updated September 14, 2026. Read this first; do not reconstruct the project from chat. This file supersedes earlier Higgsfield/sample-only notes.
 
-## Decisions
-- One private ESPN NFL league for Johnathan. Desktop and Pixel 8 Pro.
-- Unlisted. No community publication. Public URL serves fictional sample data only.
-- Latest UI priority overrides the initial scroll-scrub template: open the decision desk directly, with no intro film.
-- Custom light sage and forest interface, desktop sidebar, phone bottom navigation, 48px actions, accessible native dialog.
-- Read-only companion. Never execute ESPN transactions automatically.
-- No routine LLM API use. Deterministic local calculations and compact persistent state.
-- No secrets in chat, source, browser storage, logs, or exports.
+## Owner decisions
+- One private ESPN NFL league: 10309566 / team 25 / season 2026.
+- Desktop and Pixel 8 Pro; light sage/forest decision desk; tap-first workflow.
+- Read-only ESPN, private/unlisted, no community feed, no automatic fantasy transactions.
+- Minimize manual upkeep and token use. No LLM dependency. Store compact durable state and bounded history.
+- GitHub/Cloudflare infrastructure deployment and additive migrations are authorized. Never print or commit credentials.
 
-## Working in this release
-- Today dashboard, roster, bench, player search and position filters.
-- Player watchlist, two-player comparison, recent game log.
-- Exact eligible-slot optimizer for sample roster; out/bye exclusion; locked player preservation.
-- Marginal waiver improvement ranking, sample availability reports.
-- Seeded sample matchup resampling with a fixed synthetic opponent.
-- Notes, watchlists and reviewed flags persist on the current browser. No cross-device sync yet.
-- Sample lineup changes last for this visit. Nothing is sent to ESPN.
-- JSON review export, manifest and icons, offline explanation page.
-- /api/gridiron/status still returns sample mode; no live dashboard data is implied.
-- /connections now has owner authentication, encrypted cookie storage and read-only ESPN validation.
-- See docs/SECURE_CONNECTIONS.md for the contract, activation steps and security boundaries.
-- Hosting keys remain absent; the form stays locked until configured and redeployed.
+## Hosting and access
+- Repository: https://github.com/jsorisho715/GridIron-Edge
+- App: https://gridiron-edge.gridiron-edge-2b093f15.workers.dev/app
+- Worker gridiron-edge; D1 gridiron-edge-db; binding DB.
+- Deployment reads existing GitHub secrets and provisions through Actions. No Higgsfield runtime required.
+- The owner reported “Connection verified and encrypted credentials saved.” Do not ask for cookies again unless real auth errors demand it.
+- Cloudflare workerd rejects redirect:error. ESPN fetches use manual and reject all redirects. Regression tested in real workerd.
 
-## Unfinished, in order
-1. Production activation: configure the two hosting keys, redeploy, then verify real ESPN cookies in the owner-only form.
-2. Full league import and dashboard integration. Validate custom scoring, roster slots and live data freshness.
-3. Real historical stat import and ID reconciliation. nflverse historical data; confirm current source formats when implementing. Do not assume nflverse has a working live injury feed.
-4. Verified kickoff locks, bye status, player status timestamps, free-agent availability and opponent data.
-5. Scheduler with atomic job deduplication, bounded retry/backoff, secret-expiry health states and independent heartbeat. D1 is enabled for connection storage; monitoring remains unimplemented.
-6. Durable private notes/watchlists across phone and desktop.
-7. Real closed-app push subscriptions and delivery test. In-app report cards are not push notifications.
-8. Historical backtests without future leakage. No fabricated accuracy or calibrated win-probability claims.
+## Live release
+- `/` and `/app` mount LiveWorkspace. Owner-gated API, live roster/scores/standings/scoring/slots.
+- ESPN player cards supply league-scored projections and up to 32 completed weekly game logs; free pool 75, selected cards 120, waiver comparisons 35.
+- Exact slot matching, kickoff timers, bye/out exclusion, partial estimate labels. All moves reviewed in ESPN.
+- 15-minute scheduled refresh, atomic lease, 2-minute minimum refresh, exponential backoff, last-good cache, revision-safe commits, heartbeat and deduplicated alerts.
+- Notes/watch/review state in D1 with optimistic conflict checks; no browser storage of private state.
+- Automatically generated encrypted VAPID keys and encrypted subscriptions; generic Web Push. Enable and test per device.
+- Independent hourly GitHub health workflow. GitHub may disable scheduled workflows after 60 days of repository inactivity; Cloudflare sync is independent.
+- Additive migration 0003, no existing credential deletion. Deployment verifies real owner login and imports data, logging counts only.
 
 ## Code map
-- src/lib/gridiron.ts: fictional fixtures, estimates, optimizer, simulation and waiver ranking.
-- src/components/gridiron/Workspace.tsx: shared desktop/mobile workflow.
-- src/components/gridiron/panels.tsx: dialogs, comparison, lineup review, settings.
-- src/gridiron.css: custom design tokens and responsive styles.
-- src/routes/index.tsx and app.tsx: same workspace surface.
-- tests/gridiron.test.ts: 8 decision-logic tests.
-- public/manifest.webmanifest and sw.js: install and safe offline fallback. No API or private HTML caching.
+- src/lib/football.ts: typed model, forecast, exact lineup matching, waiver options, walk-forward checks.
+- espn-data.server.ts and espn-normalize.ts: bounded fixed-host fetch and normalization.
+- workspace.server.ts: private API, sync, persistence and alert creation.
+- push.server.ts: VAPID, encrypted subscriptions and delivery.
+- espn-connection.server.ts / espn-security.server.ts: owner authentication and encrypted credentials.
+- src/components/gridiron/LiveWorkspace.tsx: live workflow; src/live.css + gridiron.css: design.
+- src/server.ts: scheduled handler and security headers.
+- scripts/qa-live.cjs / qa-fixture.ts: synthetic browser checks; check-worker-runtime.mjs: real workerd checks.
+- scripts/deploy-cloudflare.mjs: production provisioning + authenticated verification.
+- Legacy gridiron.ts, Workspace.tsx and panels.tsx remain unused scaffold. Never silently reintroduce their sample data.
 
-## Validation
-- bun run typecheck
-- bun test tests/*.test.ts (27 pass, including 13 connection security tests)
-- bun run build
-- Browser-tested at 1440px desktop and 412px mobile: no horizontal overflow, lineup application, search, comparison, Escape close, notes/watch persistence, bottom navigation, no page errors.
-- Real Pixel hardware, actual Chrome installation and live ESPN authentication remain untested.
+## Validation and limits
+43 tests passed locally, typecheck/build/audit clean. Browser flows passed at 360/412/448/1440px with no page errors or tested accessibility violations. workerd gate verifies migrations, encryption, owner sessions, live import, caching, conflicts, scheduler and encrypted Web Push with synthetic data. Production verification occurs in the deployment workflow; inspect its latest result before claiming deployment success.
+
+Physical Pixel installation and closed-app push delivery still require the owner. Predictions are uncalibrated estimates; history backtest checks the weighted baseline only. Availability flags can lag ESPN. Do not claim all NFL players are searchable, full news coverage, guaranteed accuracy, unlimited free hosting or 100% uptime.
 
 ## Continuation economy
-Read this checkpoint, then only the source files relevant to the next change. Use targeted tests. Keep the model deterministic and free of LLM calls. Save design decisions and API contract notes here as they change. Never put credentials or full third-party responses into project notes.
-
-## Repository migration
-Current project is backed by the website builder repository. A user-owned private GitHub repository is recommended for future Codex work. GitHub is not connected in this session. No user-owned repository has been created, and no migration has occurred. Copy the complete app directory, including vendored packages, lockfile and existing build instructions. This is React 19 + TanStack Start, not Next.js. Do not silently switch frameworks. Keep build/deploy secrets separate from source.
-
-## Current deployment
-https://gridiron-edge-sorisho.higgsfield.app/app
-Unlisted, not entered into community or contest. Signed-out browsers encounter the platform login. Compatible lockfile security updates resolved 37 starter advisories; final audit, typecheck, core tests and build passed.
+Read this file, inspect git status and latest Actions run, then only relevant code. Reuse test fixtures. Never save real league payloads, keys or cookies into notes, screenshots or logs. Check official provider code if schema changes; do not add more paid services or switch frameworks without a concrete need.

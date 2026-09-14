@@ -6,8 +6,7 @@ export function applySecurityHeaders(response: Response): Response {
   const headers = new Headers(response.headers);
   headers.set("X-Robots-Tag", "noindex, nofollow");
   headers.set("Cache-Control", "no-store");
-  // The deployment platform owns `frame-ancestors`; setting it here would add
-  // a second, intersecting policy that can block the host preview.
+  // The migrated private app does not require an embedding platform.
   headers.set(
     "Content-Security-Policy",
     "default-src 'self'; " +
@@ -15,8 +14,8 @@ export function applySecurityHeaders(response: Response): Response {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
       "font-src 'self' https://fonts.gstatic.com; " +
       "img-src 'self' data: https:; media-src 'self' blob: https:; " +
-      "connect-src 'self' https:; " +
-      "frame-src 'self' https://auth.higgsfield.app https://auth.higgsfield-dev.app; " +
+      "connect-src 'self'; " +
+      "frame-src 'none'; frame-ancestors 'none'; object-src 'none'; " +
       "base-uri 'self'; form-action 'self'",
   );
   headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");

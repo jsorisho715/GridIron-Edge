@@ -32,6 +32,7 @@ export default defineConfig(({ command, mode }) => {
       tsconfigPaths: true,
       alias: [{ find: /^@higgsfield-ai\/icons(\/.*)?$/, replacement: QUANTA_ICONS_SHIM }],
     },
+    optimizeDeps: { exclude: ["cloudflare:workers"] },
     // The server bundle runs as a Cloudflare Worker — there is no node_modules
     // at runtime. Vite's default SSR build leaves npm deps as bare external
     // imports (h3, react, @tanstack/*, seroval, …), which resolve on a Node

@@ -1,3 +1,5 @@
+> Current deployment: [Gridiron Edge](https://gridiron-edge.gridiron-edge-2b093f15.workers.dev/connections). GitHub Actions is the source of deployment secrets. The owner has verified and saved the production ESPN connection. Earlier Higgsfield activation and sample-only notes below are historical; README and PROJECT_STATE.md supersede them. No additional hosting setup is required for live monitoring.
+
 # Secure ESPN connection — implementation checkpoint
 
 ## Release boundary

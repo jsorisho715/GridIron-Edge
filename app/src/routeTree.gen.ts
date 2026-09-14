@@ -14,6 +14,7 @@ import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as ConnectionsRouteImport } from './routes/connections'
 import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiGridironWorkspaceRouteImport } from './routes/api/gridiron/workspace'
 import { Route as ApiGridironStatusRouteImport } from './routes/api/gridiron/status'
 import { Route as ApiGridironConnectionRouteImport } from './routes/api/gridiron/connection'
 
@@ -42,6 +43,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGridironWorkspaceRoute = ApiGridironWorkspaceRouteImport.update({
+  id: '/api/gridiron/workspace',
+  path: '/api/gridiron/workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGridironStatusRoute = ApiGridironStatusRouteImport.update({
   id: '/api/gridiron/status',
   path: '/api/gridiron/status',
@@ -61,6 +67,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/gridiron/connection': typeof ApiGridironConnectionRoute
   '/api/gridiron/status': typeof ApiGridironStatusRoute
+  '/api/gridiron/workspace': typeof ApiGridironWorkspaceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,6 +77,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/gridiron/connection': typeof ApiGridironConnectionRoute
   '/api/gridiron/status': typeof ApiGridironStatusRoute
+  '/api/gridiron/workspace': typeof ApiGridironWorkspaceRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -80,6 +88,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/gridiron/connection': typeof ApiGridironConnectionRoute
   '/api/gridiron/status': typeof ApiGridironStatusRoute
+  '/api/gridiron/workspace': typeof ApiGridironWorkspaceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -91,6 +100,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/api/gridiron/connection'
     | '/api/gridiron/status'
+    | '/api/gridiron/workspace'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,6 +110,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/api/gridiron/connection'
     | '/api/gridiron/status'
+    | '/api/gridiron/workspace'
   id:
     | '__root__'
     | '/'
@@ -109,6 +120,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/api/gridiron/connection'
     | '/api/gridiron/status'
+    | '/api/gridiron/workspace'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -119,6 +131,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ApiGridironConnectionRoute: typeof ApiGridironConnectionRoute
   ApiGridironStatusRoute: typeof ApiGridironStatusRoute
+  ApiGridironWorkspaceRoute: typeof ApiGridironWorkspaceRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -158,6 +171,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/gridiron/workspace': {
+      id: '/api/gridiron/workspace'
+      path: '/api/gridiron/workspace'
+      fullPath: '/api/gridiron/workspace'
+      preLoaderRoute: typeof ApiGridironWorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/gridiron/status': {
       id: '/api/gridiron/status'
       path: '/api/gridiron/status'
@@ -183,6 +203,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ApiGridironConnectionRoute: ApiGridironConnectionRoute,
   ApiGridironStatusRoute: ApiGridironStatusRoute,
+  ApiGridironWorkspaceRoute: ApiGridironWorkspaceRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

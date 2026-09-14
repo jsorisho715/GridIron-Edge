@@ -1,0 +1,23 @@
+name: Monitor private league health
+on:
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: gridiron-edge-health
+  cancel-in-progress: false
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check private sync and scheduler
+        env:
+          OWNER_ACCESS_KEY: ${{ secrets.OWNER_ACCESS_KEY }}
+        run: node app/scripts/check-health.mjs

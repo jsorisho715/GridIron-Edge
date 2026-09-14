@@ -1,30 +1,32 @@
-# Release audit
+# Live workspace release audit
 
-| Check | Result | Evidence |
-|---|---|---|
-| Typecheck | PASS | TanStack route generation and TypeScript |
-| Production build | PASS | UI contract and Vite client/server build |
-| Dependency audit | PASS | 37 starter advisories resolved with compatible lockfile updates; audit clean |
-| Model tests | PASS | 8 tests, 22 assertions |
-| Mobile workflow | PASS | 412px browser, no overflow; lineup, watch, compare, notes, navigation |
-| Desktop layout | PASS | 1440px browser, no overflow, screenshot reviewed |
-| Accessibility | PASS | Labeled inputs/buttons, keyboard focus, native modal Escape |
-| Private boundary | PASS | Owner-gated connections API; missing hosting keys fail closed |
-| Secret exposure | PASS | AES-GCM encryption; masked inputs; no secrets in responses, logs or browser storage |
-| External writes | PASS | None; sample decisions stay in browser |
-| Data claims | PASS | Fictional mode stated globally; synthetic model assumptions disclosed |
-| Indexing | PASS | noindex headers/meta and robots disallow |
-| Heading structure | PASS | One H1; section H2; dialog H3 beneath H2 |
-| Cover and metadata | PASS | Branded cover, title, description, icon |
-| Physical Android test | PENDING | Browser emulation does not substitute for Pixel hardware |
-| Live monitoring | PENDING | Not implemented or activated |
+September 14, 2026. Automated checks reduce regressions; they do not prove universal perfect behavior.
 
-The interface is ready for sample review. This is not the completed live-league product.
+| Check | Local result |
+|---|---|
+| Typecheck and production build | Passed |
+| Unit/integration suite | 43 tests, 324 assertions passed |
+| Dependency audit | No known advisories returned |
+| Desktop + mobile browser workflows | Passed at widths 360, 412, 448 and 1440 |
+| JavaScript page errors / horizontal overflow | None in tested workflows |
+| Automated WCAG A/AA checks | Zero violations across eight audited states |
+| Workerd runtime | Provider access errors, D1 migrations, encrypted import, sessions, cache, write conflicts, scheduler and encrypted Web Push passed |
+| Production owner import | Required automatically after deployment; inspect latest Actions result |
+| Physical Pixel installation / closed-app push | Owner device check required |
 
-Connection update: all 27 tests pass (125 assertions), including 13 security tests.
-Local desktop (1440px) and phone (412px) UI workflows pass with synthetic responses.
-Screenshots reviewed; no overflow or page errors. See SECURE_CONNECTIONS.md.
-Hosting keys remain unconfigured. Live private ESPN verification, real D1 credential
-writes and physical Pixel hardware remain untested.
+Browser checks cover the owner gate, Today, lineup modal and Escape, player search, comparison, watching, saved notes across reloads, phone navigation, waivers, reports, standings and preserved UI during provider errors. Fixtures are synthetic. Real ESPN cookies are never used in browser test fixtures or output artifacts.
 
-Deployment is unlisted. An unauthenticated production browser redirects to the hosting platform sign-in, so the actual hosted app has not been inspected in an authenticated owner browser. Local desktop/mobile browser checks passed.
+```sh
+bun run typecheck
+bun test tests/*.test.ts
+bun run build
+bun audit
+# Install Playwright 1.62.1 and @axe-core/playwright 4.13.0 outside the app bundle.
+SPAWN_QA_SERVER=1 PLAYWRIGHT_MODULE=/absolute/path/to/playwright AXE_MODULE=/absolute/path/to/@axe-core/playwright node scripts/qa-live.cjs
+```
+
+CI installs the browser and runs this command on every release. Set CHROMIUM_PATH only when using an existing Chromium binary. The runtime gate uses the Miniflare shipped with pinned Wrangler 4.131.1 and runs before production mutation.
+
+Production verification checks secure readiness, the connection screen, unauthenticated workspace denial, transient owner login, actual saved-credential import and matching league/team identity. Only aggregate coverage counts are logged. The verification session is revoked afterward. The independent health workflow checks fresh snapshots and cron heartbeats hourly.
+
+Audit fixes included low-contrast labels, stale kickoff locks while a page remains open, misleading partial totals, failed sync preservation, concurrent preference writes, redirect refusal and batched alert writes. Physical push delivery, ESPN data correctness and all possible custom league rules cannot be established by automated browser emulation.

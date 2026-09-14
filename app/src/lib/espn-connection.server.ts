@@ -11,7 +11,7 @@ async function sessionHash(request: Request, env: ConnectionEnv) {
   const token = request.headers.get("cookie")?.split(";").map(x => x.trim()).find(x => x.startsWith(cookieName + "="))?.slice(cookieName.length + 1);
   return token && /^[a-f0-9]{64}$/.test(token) ? keyedHash(env.OWNER_ACCESS_KEY!, "session:" + token) : "";
 }
-async function authorized(request: Request, env: ConnectionEnv) {
+export async function authorized(request: Request, env: ConnectionEnv) {
   const hash = await sessionHash(request, env);
   if (!hash) return false;
   return !!await env.DB!.prepare("SELECT hash FROM ge_owner_sessions WHERE hash = ? AND expires_at > ?").bind(hash, Date.now()).first();
@@ -44,7 +44,7 @@ export async function handleConnection(request: Request, env: ConnectionEnv, tra
     // Fail closed until the additive deployment migration is present.
     await env.DB!.prepare("SELECT id FROM ge_espn_connection LIMIT 1").first();
     const isOwner = await authorized(request, env);
-    if (request.method === "GET") return json({ ready: true, authenticated: isOwner, connection: isOwner ? publicConnection(await stored(env)) : undefined, dashboardMode: "sample" });
+    if (request.method === "GET") return json({ ready: true, authenticated: isOwner, connection: isOwner ? publicConnection(await stored(env)) : undefined, dashboardMode: "live" });
     let body: Record<string, unknown>;
     try {
       const raw = await boundedText(new Response(request.body), 12288);
@@ -96,6 +96,8 @@ export async function handleConnection(request: Request, env: ConnectionEnv, tra
       ? await env.DB!.prepare("UPDATE ge_espn_connection SET envelope = ?, metadata = ?, revision = ? WHERE id = 1 AND revision = ?").bind(envelope, JSON.stringify(metadata), revision, current.revision).run()
       : await env.DB!.prepare("INSERT INTO ge_espn_connection (id, envelope, metadata, revision) VALUES (1, ?, ?, ?) ON CONFLICT(id) DO NOTHING").bind(envelope, JSON.stringify(metadata), revision).run();
     if (!result.meta.changes) throw new SafeError(409, "changed", "The connection changed in another tab. Refresh and try again.");
+    // A fresh connection should not inherit backoff from expired credentials.
+    try { await env.DB!.prepare("UPDATE ge_sync_health SET next_attempt=0,error=NULL,failures=0 WHERE id=1").run(); } catch { /* Older schemas remain compatible during rollout. */ }
     return json({ ok: true, connection: { ...metadata, revision } });
   } catch (error) {
     if (error instanceof SafeError) return json({ error: error.message, code: error.code }, error.status, error.status === 429 ? { "Retry-After": "600" } : {});

@@ -31,6 +31,11 @@ jobs:
           bun test tests/*.test.ts
           bun run build
           bun audit
+      - name: Browser and accessibility audit
+        run: |
+          npm install --prefix "$RUNNER_TEMP/gridiron-qa" playwright@1.62.1 @axe-core/playwright@4.13.0 --no-audit --no-fund
+          node "$RUNNER_TEMP/gridiron-qa/node_modules/playwright/cli.js" install --with-deps chromium
+          SPAWN_QA_SERVER=1 PLAYWRIGHT_MODULE="$RUNNER_TEMP/gridiron-qa/node_modules/playwright" AXE_MODULE="$RUNNER_TEMP/gridiron-qa/node_modules/@axe-core/playwright" node scripts/qa-live.cjs
       - name: Install deployment tooling
         run: npm install --prefix "$RUNNER_TEMP/gridiron-tools" wrangler@4.131.1 --no-audit --no-fund
       - name: Provision, deploy and verify
