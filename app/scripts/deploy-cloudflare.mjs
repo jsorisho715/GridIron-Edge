@@ -73,6 +73,13 @@ async function main() {
     try { rmdirSync(dir); } catch {}
   }
   const origin = "https://" + name + "." + subdomain + ".workers.dev";
+  const get = async path => {
+    for(let attempt=0;attempt<3;attempt++){
+      try{const response=await fetch(origin+path,{redirect:'error',signal:AbortSignal.timeout(15000)});if(response.status<500||attempt===2)return response;await response.body?.cancel();}
+      catch(error){if(attempt===2)throw new Error('Loading check could not reach '+path+' ('+(error.cause?.code||error.name||'network')+').');}
+      await new Promise(resolve=>setTimeout(resolve,1000*(attempt+1)));
+    }
+  };
   let healthy = false;
   for (let attempt = 0; attempt < 12; attempt++) {
     let status;
@@ -87,19 +94,19 @@ async function main() {
     await new Promise(r => setTimeout(r, 5000));
   }
   check(healthy, "Worker deployed but secure setup readiness failed. Check bindings and migrations.");
-  const html = await fetch(origin + "/connections", { redirect: "error", signal: AbortSignal.timeout(15000) });
+  const html = await get("/connections");
   check(html.ok && (await html.text()).includes("Secure connections"), "Connection screen smoke check failed.");
   // Check deployed entry pages, install assets and their first-party CSS/font/JS references.
-  const pageResponse=await fetch(origin+'/app',{redirect:'error',signal:AbortSignal.timeout(15000)});
+  const pageResponse=await get('/app');
   check(pageResponse.ok,'Workspace page failed to load.');const pageHTML=await pageResponse.text();
   const paths=new Set(['/manifest.webmanifest','/sw.js','/offline.html','/icon-192.png','/icon-512.png','/robots.txt']);
   for(const match of pageHTML.matchAll(/(?:href|src)="(\/assets\/[^"?#]+)"/g))paths.add(match[1]);
   let assetsChecked=0;
-  const asset=async path=>{const r=await fetch(origin+path,{redirect:'error',signal:AbortSignal.timeout(15000)});check(r.ok,'A deployed asset failed to load: '+path);assetsChecked++;if(r.headers.get('content-type')?.includes('text/css')){const css=await r.text();check(!/data:font\//.test(css),'Inline fonts violate the production CSP.');return [...css.matchAll(/url\(["']?([^"')]+)["']?\)/g)].map(m=>new URL(m[1],origin+path)).filter(u=>u.origin===origin&&/\.woff2?$/.test(u.pathname)).map(u=>u.pathname);}await r.arrayBuffer();return [];};
+  const asset=async path=>{const r=await get(path);check(r.ok,'A deployed asset failed to load: '+path);assetsChecked++;if(r.headers.get('content-type')?.includes('text/css')){const css=await r.text();check(!/data:font\//.test(css),'Inline fonts violate the production CSP.');return [...css.matchAll(/url\(["']?([^"')]+)["']?\)/g)].map(m=>new URL(m[1],origin+path)).filter(u=>u.origin===origin&&/\.woff2?$/.test(u.pathname)).map(u=>u.pathname);}await r.arrayBuffer();return [];};
   const fonts=new Set();const initial=[...paths];for(let i=0;i<initial.length;i+=6)for(const found of await Promise.all(initial.slice(i,i+6).map(asset)))for(const path of found)fonts.add(path);
   const fontPaths=[...fonts];for(let i=0;i<fontPaths.length;i+=6)await Promise.all(fontPaths.slice(i,i+6).map(asset));
   console.log('Production loading checks passed: '+assetsChecked+' install, script, style and font assets.');
-  const privateStatus = await fetch(origin + "/api/gridiron/workspace", { redirect: "error", signal: AbortSignal.timeout(15000) });
+  const privateStatus = await get("/api/gridiron/workspace");
   check(privateStatus.status === 401, "Private workspace must reject unauthenticated reads.");
   let cookie;
   const privateCall = async (path, body) => {
