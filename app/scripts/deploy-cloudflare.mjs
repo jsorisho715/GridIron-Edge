@@ -75,7 +75,18 @@ async function main() {
   const origin = "https://" + name + "." + subdomain + ".workers.dev";
   const get = async path => {
     for(let attempt=0;attempt<3;attempt++){
-      try{const response=await fetch(origin+path,{redirect:'error',signal:AbortSignal.timeout(15000)});if(response.status<500||attempt===2)return response;await response.body?.cancel();}
+      try{
+        let url=new URL(origin+path),response;
+        for(let hop=0;hop<4;hop++){
+          response=await fetch(url,{redirect:'manual',signal:AbortSignal.timeout(15000)});
+          if(response.status<300||response.status>=400)break;
+          const location=response.headers.get('location');check(location,'Asset redirect has no destination.');
+          const next=new URL(location,url);check(next.origin===origin&&!next.username&&!next.password,'Asset redirected outside this app.');
+          await response.body?.cancel();url=next;
+        }
+        check(response.status<300||response.status>=400,'Asset redirect limit reached.');
+        if(response.status<500||attempt===2)return response;await response.body?.cancel();
+      }
       catch(error){if(attempt===2)throw new Error('Loading check could not reach '+path+' ('+(error.cause?.code||error.name||'network')+').');}
       await new Promise(resolve=>setTimeout(resolve,1000*(attempt+1)));
     }
