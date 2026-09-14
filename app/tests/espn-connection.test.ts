@@ -83,7 +83,7 @@ describe("owner-only ESPN connection", () => {
     const row = f.db.query("SELECT * FROM ge_espn_connection").get();
     expect(JSON.stringify(row)).not.toContain(input.espnS2); expect(JSON.stringify(row)).not.toContain(input.swid);
     expect(f.calls[0].url).toBe("https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/2026/segments/0/leagues/10309566?view=mSettings&view=mTeam");
-    expect(f.calls[0].options.method).toBe("GET"); expect(f.calls[0].options.redirect).toBe("error"); expect(f.calls[0].options.signal).toBeDefined();
+    expect(f.calls[0].options.method).toBe("GET"); expect(f.calls[0].options.redirect).toBe("manual"); expect(f.calls[0].options.signal).toBeDefined();
     expect(await (await f.call()).json()).not.toHaveProperty("connection");
     f.db.close();
   });
@@ -136,6 +136,6 @@ test("provider validation rejects header injection and mismatched data", async (
   expect(() => validateCredentials({ ...input, espnS2: "value\\r\\nCookie: injected" })).toThrow();
   expect(() => validateCredentials({ ...input, leagueId: "https://evil.test" })).toThrow();
   await expect(verifyESPN(input, (async () => Response.json({ id: 1, teams: [] })) as typeof fetch)).rejects.toThrow("did not match");
-  await expect(verifyESPN(input, (async () => { throw new Error(input.espnS2); }) as typeof fetch)).rejects.toThrow("Could not complete");
+  await expect(verifyESPN(input, (async () => { throw new Error(input.espnS2); }) as typeof fetch)).rejects.toThrow("Cookie validity could not be checked");
   await expect(verifyESPN(input, (async () => new Response("x".repeat(20), { headers: { "Content-Type": "application/json", "Content-Length": "99999999" } })) as typeof fetch)).rejects.toThrow("too large");
 });

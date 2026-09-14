@@ -2,6 +2,7 @@ import { writeFileSync, appendFileSync, mkdtempSync, unlinkSync, rmdirSync } fro
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
+import { checkWorkerRuntime } from "./check-worker-runtime.mjs";
 
 const { CLOUDFLARE_API_TOKEN: token, CLOUDFLARE_ACCOUNT_ID: account, OWNER_ACCESS_KEY: owner, CREDENTIAL_ENCRYPTION_KEY: encryption } = process.env;
 const name = process.env.APP_SLUG || "gridiron-edge";
@@ -23,6 +24,7 @@ async function main() {
   check(owner && owner.length >= 32 && owner.length <= 256, "OWNER_ACCESS_KEY must be 32 to 256 characters.");
   check(/^[a-fA-F0-9]{64}$/.test(encryption || ""), "CREDENTIAL_ENCRYPTION_KEY must be exactly 64 hex characters.");
   check(/^[a-z][a-z0-9-]{2,40}$/.test(name), "Invalid Worker name.");
+  await checkWorkerRuntime(join(process.env.RUNNER_TEMP || tmpdir(), "gridiron-tools/node_modules/wrangler/package.json"));
   let subdomain = (await api("/workers/subdomain"))?.subdomain;
   if (!subdomain) {
     // Only provision an absent address; never rename an existing account address.

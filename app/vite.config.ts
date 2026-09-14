@@ -67,6 +67,9 @@ export default defineConfig(({ command, mode }) => {
       external: ["cloudflare:workers"],
     },
     build: {
+      // Small bundled fonts otherwise become data: URLs blocked by font-src.
+      // Serve them as same-origin files without widening the security policy.
+      assetsInlineLimit: (filePath) => /\.(?:woff2?|ttf|otf)$/i.test(filePath) ? false : undefined,
       // Keep `cloudflare:*` external in the SSR rollup pass too — `noExternal`
       // above would otherwise try to resolve+bundle it and fail.
       rollupOptions: { external: [/^cloudflare:/] },

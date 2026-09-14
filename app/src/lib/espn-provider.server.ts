@@ -18,8 +18,15 @@ export async function verifyESPN(input: ESPNInput, transport: typeof fetch = fet
   url.searchParams.append("view", "mSettings");
   url.searchParams.append("view", "mTeam");
   try {
-    const response = await transport(url, { method: "GET", redirect: "error", signal: AbortSignal.timeout(15000), headers: { Accept: "application/json", Cookie: "SWID=" + input.swid + "; espn_s2=" + input.espnS2 } });
-    if (response.status === 401 || response.status === 403) throw new SafeError(422, "espn_auth", "ESPN did not accept these cookies. Sign in to ESPN again and copy fresh values.");
+    // workerd rejects redirect:"error" before sending the request. Manual mode
+    // lets us reject redirects explicitly without forwarding cookies elsewhere.
+    const response = await transport(url, { method: "GET", redirect: "manual", signal: AbortSignal.timeout(15000), headers: { Accept: "application/json", Cookie: "SWID=" + input.swid + "; espn_s2=" + input.espnS2 } });
+    if (response.status >= 300 && response.status < 400) {
+      await response.body?.cancel();
+      throw new SafeError(502, "espn_redirect", "ESPN redirected the connection check. No cookies were forwarded. Open your ESPN team to confirm access, then try again.");
+    }
+    if (response.status === 401) throw new SafeError(422, "espn_auth", "ESPN did not accept these cookies. Sign in to ESPN again and copy fresh values.");
+    if (response.status === 403) throw new SafeError(422, "espn_forbidden", "ESPN denied access. Confirm this league opens in your ESPN account and copy fresh cookies. If it still fails, ESPN may be blocking server access.");
     if (response.status === 404) throw new SafeError(422, "espn_league", "ESPN could not find this league and season. Check the IDs and your ESPN access.");
     if (response.status === 429) throw new SafeError(503, "espn_busy", "ESPN is rate limiting requests. Try again later.");
     if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) throw new SafeError(502, "espn_unavailable", "ESPN is unavailable or returned an unexpected response. Your saved connection has not changed.");
@@ -31,6 +38,8 @@ export async function verifyESPN(input: ESPNInput, transport: typeof fetch = fet
     return { leagueId: input.leagueId, teamId: input.teamId, season: input.season, leagueName: cleanName(data.settings?.name, "Your ESPN league"), teamName: cleanName(team.name ?? [team.location, team.nickname].filter(Boolean).join(" "), "Team " + input.teamId), teamCount: data.teams.length, verifiedAt: new Date().toISOString() };
   } catch (error) {
     if (error instanceof SafeError) throw error;
-    throw new SafeError(502, "espn_unavailable", "Could not complete the read-only ESPN check. Try again later; saved credentials have not changed.");
+    if (error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name)) throw new SafeError(504, "espn_timeout", "ESPN did not finish responding within 15 seconds. Try again later; saved credentials have not changed.");
+    if (error instanceof SyntaxError) throw new SafeError(502, "espn_response", "ESPN returned unreadable league data. Try again later; saved credentials have not changed.");
+    throw new SafeError(502, "espn_network", "The server could not complete the ESPN request. Cookie validity could not be checked; saved credentials have not changed.");
   }
 }
