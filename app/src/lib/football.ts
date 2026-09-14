@@ -3,7 +3,7 @@ export type Slot = { id: string; espnId: number; label: string };
 export type LeaguePlayer = {
   id: string; name: string; position: string; proTeam: string; proTeamId: number;
   teamId: number | null; slot: string | null; slotId: number | null; eligible: number[];
-  status: string; availability: string; owned: number | null; locked: boolean;
+  status: string; availability: string; owned: number | null; locked: boolean; droppable: boolean;
   kickoff: string | null; opponent: string | null; bye: boolean; scheduleKnown: boolean;
   projected: number | null; actual: number | null; history: GameLog[];
 };
@@ -60,11 +60,11 @@ export function bestLineup(snapshot: Snapshot, pool=snapshot.players.filter(p=>p
 }
 export function waiverOptions(snapshot: Snapshot, now=Date.now()) {
   const roster=snapshot.players.filter(p=>p.teamId===snapshot.teamId),base=bestLineup(snapshot,roster,now);
-  const droppable=roster.filter(p=>!isHeld(p,now)&&p.slotId!==21&&p.slotId!==24);
+  const droppable=roster.filter(p=>p.droppable&&!isHeld(p,now)&&p.slotId!==21&&p.slotId!==24);
   return snapshot.players.filter(p=>p.teamId===null&&['FREEAGENT','WAIVERS'].includes(p.availability)&&!isHeld(p,now)&&!unavailable(p)&&estimateLive(p)!==null)
     .sort((a,b)=>(estimateLive(b)??-Infinity)-(estimateLive(a)??-Infinity)).slice(0,35).map(player=>{
       let result:{drop:LeaguePlayer|null;gain:number}|null=null;
-      const options:(LeaguePlayer|null)[]=roster.length<snapshot.rosterLimit?[null]:droppable;
+      const options:(LeaguePlayer|null)[]=roster.filter(p=>p.slotId!==21&&p.slotId!==24).length<snapshot.rosterLimit?[null]:droppable;
       for(const drop of options){const best=bestLineup(snapshot,[...roster.filter(p=>p.id!==drop?.id),{...player,teamId:snapshot.teamId}],now);if(best.missing)continue;const gain=best.points-base.points;if(!result||gain>result.gain+1e-6||(Math.abs(gain-result.gain)<1e-6&&(drop?estimateLive(drop)??0:0)<(result.drop?estimateLive(result.drop)??0:0)))result={drop,gain};}
       return {player,drop:result?.drop??null,gain:base.missing?null:result?.gain??null};
     }).sort((a,b)=>(b.gain??-Infinity)-(a.gain??-Infinity));

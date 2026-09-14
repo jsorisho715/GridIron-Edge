@@ -15,15 +15,17 @@ process.on('exit',()=>devServer?.kill());
   const context=await browser.newContext({viewport:{width:1440,height:1000}});
   const page=await context.newPage(),errors=[],audits=[];
   const generated=spawnSync('bun',['run','scripts/qa-fixture.ts'],{encoding:'utf8'});assert.equal(generated.status,0,generated.stderr);
-  let state=JSON.parse(generated.stdout),locked=true,failSync=false;
+  let state=JSON.parse(generated.stdout),locked=true,failSync=false,holdRead=false,releaseRead,readStarted;
   page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/api/gridiron/workspace',async route=>{
     if(locked)return route.fulfill({status:401,contentType:'application/json',body:JSON.stringify({error:'Unlock your private workspace.',code:'locked'})});
     const body=route.request().postDataJSON();let result=state;
+    if(!body&&holdRead){holdRead=false;readStarted();await new Promise(resolve=>{releaseRead=resolve;});}
     if(body?.action==='preferences'){state.preferences={...state.preferences,...body,updatedAt:Date.now()};result={preferences:state.preferences};}
     if(body?.action==='sync')result={synced:!failSync,workspace:state,...(failSync?{error:'Synthetic provider outage'}:{})};
     await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(result)});
   });
+  await page.route('**/api/gridiron/connection',route=>route.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'}));
   const overflow=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'Page overflows viewport');
   const axe=async label=>{const result=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();audits.push({label,violations:result.violations.map(v=>({id:v.id,impact:v.impact,nodes:v.nodes.slice(0,3).map(n=>n.target)}))});};
   await page.goto('http://127.0.0.1:5173/app',{waitUntil:'networkidle'});
@@ -53,7 +55,14 @@ process.on('exit',()=>devServer?.kill());
     await page.getByRole('navigation',{name:'Mobile navigation'}).getByRole('button',{name:'More',exact:true}).click();await page.locator('.ge-more').getByRole('button',{name:'League & history',exact:true}).click();await overflow();
   }
   failSync=true;await page.getByRole('button',{name:'Refresh league',exact:true}).click();await page.getByText('Synthetic provider outage',{exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'The bigger picture.'}).count(),1);
-  await page.reload({waitUntil:'networkidle'});locked=true;await page.reload({waitUntil:'networkidle'});await page.getByRole('heading',{name:'Your league. Your eyes only.'}).waitFor();
+  await page.getByRole('navigation',{name:'Mobile navigation'}).getByRole('button',{name:'More',exact:true}).click();
+  const started=new Promise(resolve=>{readStarted=resolve;});holdRead=true;
+  await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await started;
+  await page.getByRole('button',{name:'Sign out of this device'}).click();await page.getByRole('heading',{name:'Your league. Your eyes only.'}).waitFor();
+  const completed=page.waitForResponse(r=>r.url().endsWith('/api/gridiron/workspace'));releaseRead();await completed;
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  assert.equal(await page.getByRole('heading',{name:'Your league. Your eyes only.'}).count(),1,'A delayed private response must not restore data after logout');
+  locked=true;await page.reload({waitUntil:'networkidle'});await page.getByRole('heading',{name:'Your league. Your eyes only.'}).waitFor();
   assert.equal(await page.getByText('Synthetic cross-device game plan',{exact:true}).count(),0);
   await browser.close();devServer?.kill();const report={errors,audits,screenshots:['/tmp/gridiron-live-desktop.png','/tmp/gridiron-live-pixel.png'],viewports:[360,412,448,1440]};fs.writeFileSync('/tmp/gridiron-ui-audit.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));
   assert.equal(errors.length,0);assert.equal(audits.flatMap(a=>a.violations).length,0,'Accessibility violations remain');

@@ -5,7 +5,7 @@ September 14, 2026. Automated checks reduce regressions; they do not prove unive
 | Check | Local result |
 |---|---|
 | Typecheck and production build | Passed |
-| Unit/integration suite | 43 tests, 324 assertions passed |
+| Unit/integration suite | 46 tests, 331 assertions passed |
 | Dependency audit | No known advisories returned |
 | Desktop + mobile browser workflows | Passed at widths 360, 412, 448 and 1440 |
 | JavaScript page errors / horizontal overflow | None in tested workflows |

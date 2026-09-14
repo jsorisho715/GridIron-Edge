@@ -25,6 +25,6 @@ UI references are documented separately in [UI_RESEARCH.md](UI_RESEARCH.md). All
 
 ## Operating limits
 
-Four ESPN reads per successful sync, capped optional pools and bounded response size. Automatic 15-minute refresh means provider changes may appear with a delay. No repeated LLM prompts: calculations execute deterministically and preferences are persisted once changed.
+Five ESPN reads per successful sync, capped optional pools and bounded response size. Automatic 15-minute refresh means provider changes may appear with a delay. No repeated LLM prompts: calculations execute deterministically and preferences are persisted once changed.
 
 [Cloudflare documents](https://developers.cloudflare.com/workers/platform/limits/) a 10ms CPU budget and 50 subrequests per free Worker invocation. Waiting for network I/O does not consume CPU. Heavy lineup calculations run in the browser; alerts are batched. Hosting remains subject to actual account quotas. [Cron changes](https://developers.cloudflare.com/workers/configuration/cron-triggers/) can take up to 15 minutes to propagate.

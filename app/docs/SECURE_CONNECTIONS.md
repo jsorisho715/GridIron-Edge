@@ -1,110 +1,33 @@
-> Current deployment: [Gridiron Edge](https://gridiron-edge.gridiron-edge-2b093f15.workers.dev/connections). GitHub Actions is the source of deployment secrets. The owner has verified and saved the production ESPN connection. Earlier Higgsfield activation and sample-only notes below are historical; README and PROJECT_STATE.md supersede them. No additional hosting setup is required for live monitoring.
+# Secure connection contract
 
-# Secure ESPN connection — implementation checkpoint
+Current app: [Secure connections](https://gridiron-edge.gridiron-edge-2b093f15.workers.dev/connections). The owner confirmed successful production verification on September 14, 2026. GitHub Actions holds the deployment secrets; Cloudflare stores encrypted ESPN cookies. No Higgsfield setup is required.
 
-## Release boundary
-The owner-only connection screen is implemented at /connections and linked from
-workspace Settings. It verifies and saves ESPN access only. The dashboard remains
-fictional sample data. No scheduled sync, injury monitoring, alerts, full roster
-import, transaction submission or live recommendations are enabled.
+Defaults: league 10309566, team 25, season 2026. The form only needs SWID and espn_s2 after owner login. Never request an ESPN password or ask for cookies in chat.
 
-Non-secret defaults: league 10309566, team 25, season 2026.
-Private league URL:
-https://fantasy.espn.com/football/team?leagueId=10309566&teamId=25&seasonId=2026
+## Authentication
 
-## One-time activation
-As checked on 2026-09-13, the host reports no configured secret names.
-Configure these through the website's Higgsfield secret settings, not through chat:
-- OWNER_ACCESS_KEY: 32–256 characters of cryptographically random material.
-- CREDENTIAL_ENCRYPTION_KEY: exactly 64 hexadecimal characters / 32 random bytes.
+One owner; seven-day server-side sessions. Cookie `__Host-ge_owner` is Secure, HttpOnly, SameSite=Strict and Path=/. D1 contains only keyed session hashes. Login rotates the current browser session; logout revokes it. Rotating OWNER_ACCESS_KEY invalidates all sessions.
 
-The locked screen includes an optional local-only generator for two independent
-64-hex keys and explicit copy buttons. It does not configure hosting. Save keys in
-a password manager, add them to host settings, and deploy again. Do not regenerate
-keys already configured unless deliberately rotating them.
-
-The app manifest enables D1. Migration 0002_secure_espn.sql is additive and must be
-applied by deployment. No keys, missing DB, or missing schema => fail closed.
-No first-visitor bootstrap or public signup exists.
-
-After activation: unlock using the owner key, paste SWID and espn_s2, consent to
-the read-only check, and select Verify & save connection. Never enter an ESPN
-password. Never ask the owner to put cookies or hosting secrets in chat.
-
-## Auth and data boundary
-- One owner, server-side sessions, seven-day expiry, no sliding extension.
-- Cookie: __Host-ge_owner; Secure; HttpOnly; SameSite=Strict; Path=/.
-- Database stores only keyed session hashes. Login rotates the current session.
-- Logout revokes the current session. Rotating OWNER_ACCESS_KEY invalidates all.
-- Same-origin Origin + Fetch Metadata checks on every mutation; JSON only.
-- Atomic per-IP and global login limits; bounded provider checks; expired limits
-  cleaned on login. CF-Connecting-IP is trusted only as supplied by the host.
-- Every private read/write checks owner auth. Unauthenticated status omits league
-  metadata. Public setup returns readiness and missing binding names only.
-- Credential fields are uncontrolled DOM inputs, never React state/props,
-  browser storage, exported files or app logs. Submit and pagehide clear fields.
-- The design inspector is not installed on /connections.
-- Secret values are sent only in same-origin POST bodies and server-to-ESPN
-  Cookie headers. They are never returned by the API.
+Every private read/write checks owner authentication. Mutations require same-origin Origin/Fetch Metadata and bounded JSON. Login has atomic per-IP and global throttles. Public readiness reveals only configuration readiness. Credential inputs are uncontrolled, cleared after submission/pagehide, and excluded from state, storage, exports and logs. No design inspector is installed. Production CSP refuses framing and browser API requests to other origins.
 
 ## Encryption and concurrency
-AES-256-GCM, random 96-bit nonce per save, external key, authenticated versioned
-context. Both cookies and league IDs are in the encrypted envelope.
-Only owner-visible, sanitized metadata (names, IDs, verification time) is separate.
-No credential suffixes or recoverable UI values are displayed.
 
-Verify submitted credentials before saving. Failed replacements preserve the
-old encrypted record. Revision checks plus conditional writes prevent stale tabs
-from overwriting newer saves. Delete requires explicit confirmation and revision.
-Disconnect removes this app's stored record, not ESPN's session or account data.
-Encryption-key rotation makes previous encrypted credentials unreadable; replace
-cookies or disconnect/reconnect. There is no secret recovery feature.
+AES-256-GCM uses a fresh 96-bit nonce per save and authenticated versioned context. Cookies and league identifiers are encrypted. Sanitized names, IDs and verification time are stored separately as owner-only metadata. No credential fragments can be recovered from the UI.
 
-## Provider boundary
-Fixed GET endpoint at lm-api-reads.fantasy.espn.com:
- /apis/v3/games/ffl/seasons/{year}/segments/0/leagues/{leagueId}
-Views: mSettings and mTeam. No caller-controlled host, path or view.
-Redirects rejected, 15-second timeout, response capped at 2 MiB.
-Requests capped at 12 KiB. UUID/cookie syntax, season and IDs validated.
-Matching league/season/team required; names limited to 160 characters.
-No ESPN response body, upstream error or credential is logged or echoed.
+Verification happens before replacement. Failed replacements preserve the old encrypted record. Conditional revision checks prevent stale overwrites and prevent a slow sync from reviving a disconnected connection. Disconnect requires confirmation and removes the saved cookie record; it does not log out the ESPN account. Cached data and scoped notes are retained server-side but not served without a matching active connection.
 
-The endpoint is unofficial and can change or stop working. The test verifies
-read access to the requested league/team, not a legal ownership attestation.
-It does not parse custom scoring or populate the decision dashboard.
+## Recovery
 
-## Code map
-- src/lib/espn-security.server.ts: crypto, config checks, bounded body reading.
-- src/lib/espn-provider.server.ts: input validation and read-only ESPN adapter.
-- src/lib/espn-connection.server.ts: dependency-injected protected API handler.
-- src/lib/espn-runtime.server.ts: actual host bindings; local Vite fails closed.
-- src/routes/api/gridiron/connection.ts: GET status; POST login/save/test/logout/disconnect.
-- src/components/gridiron/Connections.tsx + src/connections.css: desktop/phone UI.
-- migrations/0002_secure_espn.sql: sessions, rate limits, encrypted connection.
-- tests/espn-connection.test.ts: 13 security tests using in-memory SQLite and
-  synthetic transport, not real credentials or production data.
-- scripts/qa-connections.cjs: local Playwright UI regression tests with synthetic
-  API responses. Set PLAYWRIGHT_MODULE if Playwright is globally installed.
+Existing GitHub Actions secrets are `OWNER_ACCESS_KEY`, `CREDENTIAL_ENCRYPTION_KEY`, and `CLOUDFLARE_API_TOKEN`. To recover a lost owner key, change only OWNER_ACCESS_KEY and redeploy. Do not change only the Cloudflare copy because the next deploy replaces it from GitHub. Store the new key in a password manager.
 
-## Verification and limits
-All 27 repository tests pass (125 assertions), including 13 connection tests.
-Production build, typecheck and dependency audit pass.
-Local 1440px desktop and 412px phone checks pass: setup, key generator, login,
-prefilled IDs, error handling, cleared secrets, save/test/replace/delete/logout,
-no secret persistence, no horizontal overflow and no page errors.
-Desktop and phone screenshots visually reviewed.
+Changing CREDENTIAL_ENCRYPTION_KEY makes prior cookies and Web Push envelopes unreadable. A deliberate encryption-key rotation requires re-entering ESPN cookies and resetting encrypted push configuration/subscriptions before enabling notifications again. No secret recovery mechanism exists. Routine releases preserve both keys and saved credentials.
 
-Live private ESPN access and real Pixel hardware remain untested. The hosting
-secrets are not configured; do not claim successful live credential activation.
-The local development preview intentionally has no production bindings.
-Production deployment must follow after secret changes.
+## Provider and notification boundaries
 
-## Continuation economy
-Read PROJECT_STATE.md and this file before touching connection code. Reuse the
-13 security tests and the UI harness; do not repeat broad repository research.
-No LLM calls exist in login, encryption, connection checking or sample calculations.
-Future monitoring must use deterministic scheduled jobs with deduplication and
-backoff, not recurring model polling. Store compact state, not repeated payloads.
+ESPN calls use fixed HTTPS hosts and GET-only views. `redirect:manual` rejects redirects without forwarding cookies. Requests have a 15-second timeout and bounded bodies (2 MiB verification, 6 MiB data import). Auth and provider errors return safe messages without raw bodies or credentials. The interface is unofficial and can change.
 
-Provider reference: https://github.com/cwendt94/espn-api/wiki/League-Class
-Crypto reference: https://developers.cloudflare.com/workers/runtime-apis/web-crypto/
+Web Push automatically generates VAPID keys, encrypts the private key and device subscriptions, limits registration to five devices and sends only to approved browser push hosts. Notification text is generic. Browser/OS permission and closed-app delivery must be checked on the device. Owner login is still required to read the league after opening a notification.
+
+## Code and regression checks
+
+`espn-security.server.ts`, `espn-provider.server.ts`, `espn-connection.server.ts` implement the core boundary. `workspace.server.ts` adds private data and revision-safe sync; `push.server.ts` adds encrypted push. Migrations 0002 and 0003 are additive. Unit tests and the real workerd deployment gate cover encryption, session lifecycle, redirects, rate limiting, bounded requests and race conditions. See QA.md for current results.

@@ -26,3 +26,24 @@ test('waiver gain is unknown when a locked starter lacks a projection and histor
   const s=snapshot(),p=s.players[0];p.projected=null;p.history=[];p.locked=true;
   expect(waiverOptions(s,now).every(w=>w.gain===null)).toBe(true);
 });
+
+test('a watched player remains imported after dropping out of the ranked free-agent pool',()=>{
+  const f=leagueFixture(),watched={...f.free.players[0],player:{...f.free.players[0].player,id:99999,fullName:'Watched outside ranked pool'}};
+  f.cards.players.unshift(watched);
+  const s=normalizeLeague(f.core,f.cards,f.free,f.schedule,input,now);
+  expect(s.players.find(p=>p.id==='99999')).toMatchObject({name:'Watched outside ranked pool',teamId:null,availability:'WAIVERS'});
+});
+
+test('history-only cards do not erase current roster projections',()=>{
+  const f=leagueFixture();f.cards.players=f.cards.players.map(e=>({...e,player:{...e.player,stats:e.player.stats.filter(s=>s.statSourceId===0)}}));
+  const s=normalizeLeague(f.core,f.cards,f.free,f.schedule,input,now);
+  expect(s.players.find(p=>p.id==='2500')?.projected).toBe(12);
+});
+
+test('waiver drops respect ESPN cut restrictions and do not count an empty IR slot as ordinary space',()=>{
+  const f=leagueFixture();Object.assign(f.core.settings.rosterSettings.lineupSlotCounts,{21:1});
+  const s=normalizeLeague(f.core,f.cards,f.free,f.schedule,input,now);expect(s.rosterLimit).toBe(13);
+  const roster=s.players.filter(p=>p.teamId===25);for(const p of roster)p.droppable=false;
+  expect(waiverOptions(s,now).every(w=>w.gain===null)).toBe(true);
+  roster[9].droppable=true;expect(waiverOptions(s,now).every(w=>w.drop?.id===roster[9].id)).toBe(true);
+});

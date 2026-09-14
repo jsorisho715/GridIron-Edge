@@ -89,6 +89,16 @@ async function main() {
   check(healthy, "Worker deployed but secure setup readiness failed. Check bindings and migrations.");
   const html = await fetch(origin + "/connections", { redirect: "error", signal: AbortSignal.timeout(15000) });
   check(html.ok && (await html.text()).includes("Secure connections"), "Connection screen smoke check failed.");
+  // Check deployed entry pages, install assets and their first-party CSS/font/JS references.
+  const pageResponse=await fetch(origin+'/app',{redirect:'error',signal:AbortSignal.timeout(15000)});
+  check(pageResponse.ok,'Workspace page failed to load.');const pageHTML=await pageResponse.text();
+  const paths=new Set(['/manifest.webmanifest','/sw.js','/offline.html','/icon-192.png','/icon-512.png','/robots.txt']);
+  for(const match of pageHTML.matchAll(/(?:href|src)="(\/assets\/[^"?#]+)"/g))paths.add(match[1]);
+  let assetsChecked=0;
+  const asset=async path=>{const r=await fetch(origin+path,{redirect:'error',signal:AbortSignal.timeout(15000)});check(r.ok,'A deployed asset failed to load: '+path);assetsChecked++;if(r.headers.get('content-type')?.includes('text/css')){const css=await r.text();check(!/data:font\//.test(css),'Inline fonts violate the production CSP.');return [...css.matchAll(/url\(["']?([^"')]+)["']?\)/g)].map(m=>new URL(m[1],origin+path)).filter(u=>u.origin===origin&&/\.woff2?$/.test(u.pathname)).map(u=>u.pathname);}await r.arrayBuffer();return [];};
+  const fonts=new Set();const initial=[...paths];for(let i=0;i<initial.length;i+=6)for(const found of await Promise.all(initial.slice(i,i+6).map(asset)))for(const path of found)fonts.add(path);
+  const fontPaths=[...fonts];for(let i=0;i<fontPaths.length;i+=6)await Promise.all(fontPaths.slice(i,i+6).map(asset));
+  console.log('Production loading checks passed: '+assetsChecked+' install, script, style and font assets.');
   const privateStatus = await fetch(origin + "/api/gridiron/workspace", { redirect: "error", signal: AbortSignal.timeout(15000) });
   check(privateStatus.status === 401, "Private workspace must reject unauthenticated reads.");
   let cookie;
@@ -110,6 +120,7 @@ async function main() {
       if (!workspace.preferences.paused) {
         const sync = await (await privateCall("/api/gridiron/workspace", { action: "sync" })).json();
         workspace = sync.workspace;
+        if(sync.diagnostics&&workspace.snapshot?.players.filter(p=>p.teamId===workspace.snapshot.teamId).every(p=>p.projected===null))console.log("Projection coverage check: "+JSON.stringify(sync.diagnostics));
         check(!sync.error, "Live league import failed: " + (sync.error || "unknown"));
         check(workspace.snapshot, "Live league import produced no snapshot.");
       }
@@ -117,7 +128,7 @@ async function main() {
         const s = workspace.snapshot, mine = s.players.filter(p => p.teamId === s.teamId);
         check(s.leagueId === 10309566 && s.teamId === 25 && s.slots.length > 0, "Imported league identity or slots did not match this private app.");
         check(!JSON.stringify(workspace).includes('"espnS2"') && !JSON.stringify(workspace).includes('"envelope"'), "Private API exposed a credential field.");
-        console.log("Live league verified: " + JSON.stringify({ teams: s.teams.length, roster: mine.length, slots: s.slots.length, pool: s.players.length, withHistory: mine.filter(p => p.history.length).length, withSchedule: mine.filter(p => p.scheduleKnown).length, withProjection: mine.filter(p => p.projected !== null).length, warnings: s.warnings }));
+        console.log("Live league verified: " + JSON.stringify({ season: s.season, week: s.week, schedulerSeen: !!workspace.health.heartbeat, schedulerAgeMinutes: workspace.health.heartbeat?Math.round((Date.now()-workspace.health.heartbeat)/60000):null, teams: s.teams.length, roster: mine.length, slots: s.slots.length, pool: s.players.length, withHistory: mine.filter(p => p.history.length).length, withSchedule: mine.filter(p => p.scheduleKnown).length, withProjection: mine.filter(p => p.projected !== null).length, warnings: s.warnings }));
       }
     } else console.log("No ESPN connection saved; secure first-run screen verified.");
   } finally {

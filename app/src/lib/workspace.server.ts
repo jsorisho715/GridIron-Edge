@@ -39,19 +39,35 @@ export async function syncWorkspace(env:ConnectionEnv,transport:typeof fetch=fet
     const week=core.scoringPeriodId??core.status?.currentScoringPeriod??1;
     const optional=await Promise.allSettled([
       readESPN(input,'schedule',{view:'proTeamSchedules_wl'},undefined,transport),
-      readESPN(input,'league',{view:'kona_player_info',scoringPeriodId:String(week)},{players:{filterStatus:{value:['FREEAGENT','WAIVERS']},limit:75,sortPercOwned:{sortPriority:1,sortAsc:false},filterStatsForTopScoringPeriodIds:{value:18,additionalValue:['00'+input.season,'10'+input.season]}}},transport),
+      readESPN(input,'league',{view:'kona_player_info',scoringPeriodId:String(week)},{players:{filterStatus:{value:['FREEAGENT','WAIVERS']},limit:75,sortPercOwned:{sortPriority:1,sortAsc:false}}},transport),
     ]);
     const schedule=optional[0].status==='fulfilled'?optional[0].value:null,free=optional[1].status==='fulfilled'?optional[1].value:null;
     const currentMatch=(core.schedule??[]).find((m:any)=>m.matchupPeriodId===(core.status?.currentMatchupPeriod??week)&&(m.home?.teamId===input.teamId||m.away?.teamId===input.teamId));
     const opponentId=currentMatch?(currentMatch.home?.teamId===input.teamId?currentMatch.away?.teamId:currentMatch.home?.teamId):null;
-    const ids=[...new Set<number>([...(core.teams??[]).filter((t:any)=>t.id===input.teamId||t.id===opponentId).flatMap((t:any)=>(t.roster?.entries??[]).map((e:any)=>e.playerPoolEntry?.player?.id)),...(free?.players??[]).slice(0,50).map((e:any)=>e.player?.id),...preferences.watched.map(Number)].filter(Number.isSafeInteger))].slice(0,120);
-    let cards:any=null;
-    try {if(ids.length)cards=await readESPN(input,'league',{view:'kona_playercard'},{players:{filterIds:{value:ids},filterStatsForTopScoringPeriodIds:{value:18,additionalValue:['00'+input.season,'10'+input.season,'00'+(input.season-1),'10'+(input.season-1)]}}},transport);}catch{/* Optional history never replaces valid league data with fictional values. */}
-    const snapshot=normalizeLeague(core,cards,free,schedule,input,now);
+    const teamIds=(id:number|null)=>(core.teams??[]).filter((t:any)=>t.id===id).flatMap((t:any)=>(t.roster?.entries??[]).map((e:any)=>e.playerPoolEntry?.player?.id));
+    const ids=[...new Set<number>([...teamIds(input.teamId),...preferences.watched.map(Number),...teamIds(opponentId),...(free?.players??[]).slice(0,50).map((e:any)=>e.player?.id)].filter(Number.isSafeInteger))].slice(0,120);
+    let cards:any=null,weekly:any=null;
+    if(ids.length){
+      const results=await Promise.allSettled([
+        readESPN(input,'league',{view:'kona_playercard',scoringPeriodId:String(week)},{players:{filterIds:{value:ids},filterStatsForTopScoringPeriodIds:{value:18,additionalValue:['00'+input.season,'10'+input.season,'00'+(input.season-1),'10'+(input.season-1)]}}},transport),
+        readESPN(input,'league',{view:'kona_player_info',scoringPeriodId:String(week)},{players:{filterIds:{value:ids},limit:120}},transport),
+      ]);
+      cards=results[0].status==='fulfilled'?results[0].value:null;
+      weekly=results[1].status==='fulfilled'?results[1].value:null;
+    }
+    // Weekly projection views and history cards can carry different stats. Merge,
+    // never replace the current roster projection with a history-only card.
+    const merged=new Map<number,any>();
+    for(const e of [...(cards?.players??[]),...(weekly?.players??[])]){
+      const id=e.player?.id;if(!Number.isSafeInteger(id))continue;const previous=merged.get(id);
+      merged.set(id,previous?{...previous,...e,player:{...previous.player,...e.player,stats:[...(e.player.stats??[]),...(previous.player.stats??[])]}}:e);
+    }
+    const snapshot=normalizeLeague(core,merged.size?{players:[...merged.values()]}:null,free,schedule,input,now);
     if(!schedule)snapshot.warnings.push('NFL schedule unavailable. Lineup changes are held until kickoff locks can be verified.');
     if(!free)snapshot.warnings.push('Waiver availability could not be refreshed. No free-agent recommendations are shown.');
     if(!cards)snapshot.warnings.push('Player history could not be refreshed. Available ESPN projections are shown.');
     const owned=snapshot.players.filter(p=>p.teamId===input.teamId);
+    if(owned.length&&owned.every(p=>p.projected===null))snapshot.warnings.push('ESPN has not returned current-week projections. Estimates use available completed-game history.');
     if(!owned.length)snapshot.warnings.push('ESPN returned an empty roster. This may be a predraft league.');
     if(owned.some(p=>!p.scheduleKnown))snapshot.warnings.push('Some kickoff times are unknown. Those players are held in their current slots.');
     const serialized=JSON.stringify(snapshot);if(serialized.length>1500000)throw new SafeError(502,'size','League data exceeded the storage safety limit.');
@@ -70,7 +86,8 @@ export async function syncWorkspace(env:ConnectionEnv,transport:typeof fetch=fet
     await env.DB!.prepare('UPDATE ge_sync_health SET last_success=?,failures=0,error=NULL,next_attempt=?,lease_until=0 WHERE id=1 AND lease_token=?').bind(now,now+120000,lease).run();
     await env.DB!.prepare('DELETE FROM ge_alerts WHERE created_at<?').bind(now-90*86400000).run();
     await deliverAlerts(env,scope,transport).catch(()=>{});
-    return {synced:true,players:snapshot.players.length,rostered:owned.length,historyPlayers:owned.filter(p=>p.history.length).length,schedulePlayers:owned.filter(p=>p.scheduleKnown).length,warnings:snapshot.warnings};
+    const projectionPeriods=[...new Set([...merged.values()].flatMap(e=>(e.player?.stats??[]).filter((s:any)=>s.statSourceId===1).map((s:any)=>[s.seasonId,s.scoringPeriodId,s.statSplitTypeId,typeof s.appliedTotal==='number'].join(':'))))].sort().slice(0,80);
+    return {synced:true,diagnostics:{season:input.season,week,weeklyCards:weekly?.players?.length??0,projectionPeriods},players:snapshot.players.length,rostered:owned.length,historyPlayers:owned.filter(p=>p.history.length).length,schedulePlayers:owned.filter(p=>p.scheduleKnown).length,warnings:snapshot.warnings};
   }catch(error){
     const message=error instanceof SafeError?error.message:'The league response could not be imported. Last successful data is preserved.';
     const failures=(health?.failures??0)+1,delay=error instanceof SafeError&&['espn_auth','espn_forbidden','key_changed'].includes(error.code)?6*3600000:Math.min(3600000,15*60000*2**Math.min(failures-1,3));
