@@ -1,7 +1,10 @@
 name: Monitor private league health
 on:
   schedule:
-    - cron: '23 * * * *'
+    - cron: '7,22,37,52 * * * *'
+  push:
+    branches: [main]
+    paths: ['.github/workflows/health.yml', 'app/scripts/check-health.mjs']
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,7 +14,7 @@ concurrency:
 jobs:
   health:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

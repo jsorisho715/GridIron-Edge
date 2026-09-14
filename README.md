@@ -10,7 +10,7 @@ A personal ESPN NFL fantasy companion for desktop and Pixel 8 Pro, built with Re
 - A decision queue for complete lineup plans, waiver alternatives, conservative IR reviews and bilateral trade ideas. Approve/decline memory persists across devices.
 - Read-only lineup optimization, player comparisons, historical estimates and walk-forward baseline checks.
 - Availability changes, pre-kickoff alerts, watchlists and private notes across devices.
-- Automatic sync every 15 minutes, bounded retries, preserved last-good data and independent hourly health checks.
+- Automatic sync every 15 minutes, bounded retries, preserved last-good data and independent backup refresh and health checks.
 - Installable Android web app and encrypted Web Push. Enable notifications and send a test on each device.
 
 The public URL requires owner access before returning league data. Legacy fictional components remain in the source as unused scaffold; they are not mounted. The user confirmed successful production ESPN verification on September 14, 2026. The live workspace release runs an authenticated import check on deployment.
@@ -30,7 +30,7 @@ bun audit
 
 Use Node 22 and Bun 1.4.2. Local Vite has no production credentials or D1 binding; synthetic browser fixtures test the private UI. See `app/docs/QA.md` for the browser command.
 
-A push to `main` under `app/` runs tests, build, dependency audit, browser/accessibility checks, real workerd checks, additive D1 migrations, deployment and authenticated import verification. `.github/workflows/health.yml` checks scheduler freshness independently each hour. GitHub scheduled workflows may be delayed and public repositories may have schedules disabled after 60 days without repository activity; the Cloudflare sync runs separately.
+A push to `main` under `app/` runs tests, build, dependency audit, browser/accessibility checks, real workerd checks, additive D1 migrations, deployment and authenticated import verification. `.github/workflows/health.yml` checks scheduler freshness every 15 minutes and refreshes stale data if the primary scheduler misses a run. GitHub scheduled workflows may be delayed and public repositories may have schedules disabled after 60 days without repository activity; the Cloudflare sync runs separately.
 
 ## Secrets and recovery
 

@@ -24,7 +24,7 @@ Updated September 14, 2026. Read this first; do not reconstruct the project from
 - 15-minute scheduled refresh, atomic lease, 2-minute minimum refresh, exponential backoff, last-good cache, revision-safe commits, heartbeat and deduplicated alerts.
 - Notes/watch/review state in D1 with optimistic conflict checks; no browser storage of private state.
 - Automatically generated encrypted VAPID keys and encrypted subscriptions; generic Web Push. Enable and test per device.
-- Independent hourly GitHub health workflow. GitHub may disable scheduled workflows after 60 days of repository inactivity; Cloudflare sync is independent.
+- Independent GitHub health/backup workflow every 15 minutes; stale data triggers a bounded refresh and pending AI review. GitHub may disable scheduled workflows after 60 days of repository inactivity; Cloudflare sync is independent.
 - Additive migration 0003, no existing credential deletion. Deployment verifies real owner login and imports data, logging counts only.
 
 ## Code map
@@ -40,7 +40,7 @@ Updated September 14, 2026. Read this first; do not reconstruct the project from
 - Legacy gridiron.ts, Workspace.tsx and panels.tsx remain unused scaffold. Never silently reintroduce their sample data.
 
 ## Validation and limits
-46 tests passed locally, typecheck/build/audit clean. Browser flows passed at 360/412/448/1440px with no page errors or tested accessibility violations. workerd gate verifies migrations, encryption, owner sessions, live import, caching, conflicts, scheduler and encrypted Web Push with synthetic data. Production verification occurs in the deployment workflow; inspect its latest result before claiming deployment success.
+54 tests passed locally, typecheck/build/audit clean. Browser flows passed at 360/412/448/1440px with no page errors or tested accessibility violations. workerd gate verifies migrations, encryption, owner sessions, live import, caching, conflicts, scheduler and encrypted Web Push with synthetic data. Production verification occurs in the deployment workflow; inspect its latest result before claiming deployment success.
 
 Physical Pixel installation and closed-app push delivery still require the owner. Predictions are uncalibrated estimates; history backtest checks the weighted baseline only. Availability flags can lag ESPN. Do not claim all NFL players are searchable, full news coverage, guaranteed accuracy, unlimited free hosting or 100% uptime.
 
@@ -57,3 +57,5 @@ Read this file, inspect git status and latest Actions run, then only relevant co
 - Approval records a plan. Owner still confirms moves in ESPN; marking done is owner-reported, never an inferred transaction.
 - New tests cover cost caps, concurrency, caching across approvals, invalid model outputs, redirects, stale data, trade benefit for both teams and IR uncertainty. Browser checks include decision details, approvals and secure setup.
 - Existing hourly health run 34871941529 reported a missing Cloudflare heartbeat. Deployment now reads back and repairs missing cron registration. Do not claim a production heartbeat until observed.
+
+- Production release 1e3bccf passed on run 34885098918 at 19:10 UTC: 42 assets, 12 teams, 16 roster players with history/current projection/future schedule, 0 supported decisions in week 1. No AI key configured. Primary Cloudflare heartbeat still absent; health workflow now supplies independent backup refresh with an explicit degraded-primary warning.
