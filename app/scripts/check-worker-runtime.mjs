@@ -16,6 +16,7 @@ export async function checkWorkerRuntime(wranglerPackage) {
   try {
     const entry = join(dir, "check.ts"), bundle = join(dir, "check.js");
     writeFileSync(entry, `
+      import { handlePublicContext } from ${JSON.stringify(resolve("src/lib/public-context.server.ts"))};
       import { handleAdvisor } from ${JSON.stringify(resolve("src/lib/advisor.server.ts"))};
       import { verifyESPN } from ${JSON.stringify(resolve("src/lib/espn-provider.server.ts"))};
       import { handleConnection } from ${JSON.stringify(resolve("src/lib/espn-connection.server.ts"))};
@@ -32,6 +33,7 @@ export async function checkWorkerRuntime(wranglerPackage) {
         }
         if(path==='/api/gridiron/connection')return handleConnection(request,env);
         if(path==='/api/gridiron/advisor')return handleAdvisor(request,env);
+        if(path==='/api/gridiron/context')return handlePublicContext(request,env);
         if(path==='/api/gridiron/workspace')return handleWorkspace(request,env);
         if(path==='/scheduled')return Response.json(await syncWorkspace(env,fetch,true));
         try {
@@ -105,6 +107,7 @@ export async function checkWorkerRuntime(wranglerPackage) {
     assert(!JSON.stringify(result).includes('synthetic-cookie'));assert.equal(result.workspace.snapshot.players[0].history.length,9);
     assert.equal((await runtime.dispatchFetch(origin+'/api/gridiron/advisor')).status,401);
     const advice=await runtime.dispatchFetch(origin+'/api/gridiron/advisor',{headers:{Cookie:cookie}});assert.equal(advice.status,200);const adviceData=await advice.json();assert.equal(adviceData.model,'gpt-5.6-luna');assert.equal(adviceData.configured,false);assert(Array.isArray(adviceData.decisions));
+    const publicContext=await runtime.dispatchFetch(origin+'/api/gridiron/context',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json',Cookie:cookie},body:JSON.stringify({expectedSnapshot:result.workspace.snapshot.acquiredAt,gameWindow:result.workspace.snapshot.intel.nfl.gameWindow,collectedAt:Date.now(),sources:{news:{articles:[]},injuries:{injuries:[]},games:{events:[]}}})});assert.equal(publicContext.status,200);assert.equal((await publicContext.json()).updated,true);
     const before=calls;assert.equal((await (await post({action:'sync'})).json()).reason,'cached');assert.equal(calls,before);
     assert.equal((await post({action:'preferences',updatedAt:0,notes:'Runtime test note'})).status,200);
     assert.equal((await post({action:'preferences',updatedAt:0,notes:'Stale note'})).status,409);

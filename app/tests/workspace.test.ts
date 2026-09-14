@@ -7,6 +7,7 @@ import {input,leagueFixture} from './fixtures/live';
 import {validateSubscription} from '../src/lib/push.server';
 import {rememberPlayers,readPlayerMemory} from '../src/lib/player-memory.server';
 import {normalizeLeague} from '../src/lib/espn-normalize';
+import {handlePublicContext} from '../src/lib/public-context.server';
 const base='https://app.test';
 async function fixture(){const db=new Database(':memory:');for(const f of ['0002_secure_espn.sql','0003_live_workspace.sql','0005_player_memory.sql'])db.exec(await Bun.file(new URL('../migrations/'+f,import.meta.url)).text());
   const env:ConnectionEnv={OWNER_ACCESS_KEY:randomToken(),CREDENTIAL_ENCRYPTION_KEY:randomToken(),DB:{async batch(statements:any[]){return Promise.all(statements.map(s=>s.run()));},prepare(sql:string){let args:any[]=[];return{bind(...values:any[]){args=values;return this;},async first(){return db.query(sql).get(...args)??null;},async all(){return{results:db.query(sql).all(...args),success:true};},async run(){return{success:true,meta:{changes:db.query(sql).run(...args).changes}};}};}} as unknown as ConnectionEnv['DB']};
@@ -45,6 +46,15 @@ test('prediction memory freezes at kickoff and settles real outcomes including s
   await rememberPlayers(f.env,next,s,revision,time+2*86400000);let saved=(await readPlayerMemory(f.env,next,p.id)).forecasts;
   expect(saved).toHaveLength(1);expect(saved[0].estimate).toBe(first.estimate);expect(saved[0].actual).toBe(17);
   next.players[0].history.at(-1)!.points=18;await rememberPlayers(f.env,next,next,revision,time+3*86400000);saved=(await readPlayerMemory(f.env,next,p.id)).forecasts;expect(saved[0].actual).toBe(18);expect(saved[0].forecast_at).toBe(first.forecast_at);
+});
+test('public context ingestion is owner-only, tied to the current snapshot, and does not fake a league refresh',async()=>{
+  const f=await fixture();await syncWorkspace(f.env,f.transport);const data=await workspaceData(f.env),s=data.snapshot!;
+  const body={expectedSnapshot:s.acquiredAt,gameWindow:s.intel!.nfl!.gameWindow,collectedAt:Date.now(),sources:{news:{articles:[{id:123,headline:'Synthetic verified headline',published:new Date().toISOString(),links:{web:{href:'https://www.espn.com/nfl/story/_/id/123'}},categories:[]}]}}};
+  expect((await handlePublicContext(f.request(body),f.env)).status).toBe(401);
+  expect((await handlePublicContext(f.request(body,f.cookie,{origin:'https://evil.test'}),f.env)).status).toBe(403);
+  expect((await handlePublicContext(f.request({...body,expectedSnapshot:'old'},f.cookie),f.env)).status).toBe(409);
+  expect((await handlePublicContext(f.request(body,f.cookie),f.env)).status).toBe(200);
+  const after=await workspaceData(f.env);expect(after.snapshot!.intel!.news).toHaveLength(1);expect(after.health.lastSuccess).toBe(data.health.lastSuccess);expect(after.snapshot!.acquiredAt).toBe(s.acquiredAt);expect(after.snapshot!.contextUpdatedAt).toBeGreaterThan(0);
 });
 test('push registration encrypts endpoints and delivers an encrypted test only to an allowed service',async()=>{
   const f=await fixture(),pair=await crypto.subtle.generateKey({name:'ECDH',namedCurve:'P-256'},true,['deriveBits']);

@@ -21,6 +21,7 @@ export type Snapshot = {
   tradeDeadline?: number | null;
   intel?: import('./league-intel').LeagueIntel;
   playerMemory?: Record<string, string[]>;
+  contextUpdatedAt?: number;
 };
 export type Preferences = { watched: string[]; notes: string; reviewed: string[]; paused: boolean; updatedAt: number };
 export type Alert = { id: string; title: string; detail: string; playerId: string | null; kind: string; createdAt: number };

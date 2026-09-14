@@ -165,6 +165,8 @@ async function main() {
         check(!sync.error, "Live league import failed: " + (sync.error || "unknown"));
         check(workspace.snapshot, "Live league import produced no snapshot.");
       }
+      const {refreshPublicContext}=await import('./collect-public-context.mjs');
+      workspace=await refreshPublicContext(workspace,privateCall);
       if (workspace.snapshot) {
         const s = workspace.snapshot, mine = s.players.filter(p => p.teamId === s.teamId);
         check(s.leagueId === 10309566 && s.teamId === 25 && s.slots.length > 0, "Imported league identity or slots did not match this private app.");

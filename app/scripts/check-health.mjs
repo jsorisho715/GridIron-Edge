@@ -1,4 +1,5 @@
 // Independent owner-only health check. No private payloads or session values in logs.
+import {refreshPublicContext} from './collect-public-context.mjs';
 const origin='https://gridiron-edge.gridiron-edge-2b093f15.workers.dev';
 let cookie;
 const check=(ok,message)=>{if(!ok)throw new Error(message);};
@@ -20,6 +21,7 @@ try{
     check(data.snapshot,'No league snapshot is available.');
     check(!data.health.error,'ESPN sync needs attention. Review the private app for details.');
     check(data.health.lastSuccess&&Date.now()-data.health.lastSuccess<30*60000,'League data is more than 30 minutes old despite the backup refresh.');
+    data=await refreshPublicContext(data,call);
     const advisor=await (await call('/api/gridiron/advisor')).json();
     if(advisor.needsReview)await call('/api/gridiron/advisor',{action:'review'});
     if(!primaryHealthy)console.log('::warning::Cloudflare primary heartbeat is missing or late. Independent backup verified fresh league data; the primary scheduler remains degraded.');

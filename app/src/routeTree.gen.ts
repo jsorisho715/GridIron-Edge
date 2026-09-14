@@ -16,6 +16,7 @@ import { Route as AppRouteImport } from './routes/app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiGridironWorkspaceRouteImport } from './routes/api/gridiron/workspace'
 import { Route as ApiGridironStatusRouteImport } from './routes/api/gridiron/status'
+import { Route as ApiGridironContextRouteImport } from './routes/api/gridiron/context'
 import { Route as ApiGridironConnectionRouteImport } from './routes/api/gridiron/connection'
 import { Route as ApiGridironAdvisorRouteImport } from './routes/api/gridiron/advisor'
 
@@ -54,6 +55,11 @@ const ApiGridironStatusRoute = ApiGridironStatusRouteImport.update({
   path: '/api/gridiron/status',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGridironContextRoute = ApiGridironContextRouteImport.update({
+  id: '/api/gridiron/context',
+  path: '/api/gridiron/context',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiGridironConnectionRoute = ApiGridironConnectionRouteImport.update({
   id: '/api/gridiron/connection',
   path: '/api/gridiron/connection',
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/gridiron/advisor': typeof ApiGridironAdvisorRoute
   '/api/gridiron/connection': typeof ApiGridironConnectionRoute
+  '/api/gridiron/context': typeof ApiGridironContextRoute
   '/api/gridiron/status': typeof ApiGridironStatusRoute
   '/api/gridiron/workspace': typeof ApiGridironWorkspaceRoute
 }
@@ -84,6 +91,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/gridiron/advisor': typeof ApiGridironAdvisorRoute
   '/api/gridiron/connection': typeof ApiGridironConnectionRoute
+  '/api/gridiron/context': typeof ApiGridironContextRoute
   '/api/gridiron/status': typeof ApiGridironStatusRoute
   '/api/gridiron/workspace': typeof ApiGridironWorkspaceRoute
 }
@@ -96,6 +104,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/gridiron/advisor': typeof ApiGridironAdvisorRoute
   '/api/gridiron/connection': typeof ApiGridironConnectionRoute
+  '/api/gridiron/context': typeof ApiGridironContextRoute
   '/api/gridiron/status': typeof ApiGridironStatusRoute
   '/api/gridiron/workspace': typeof ApiGridironWorkspaceRoute
 }
@@ -109,6 +118,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/api/gridiron/advisor'
     | '/api/gridiron/connection'
+    | '/api/gridiron/context'
     | '/api/gridiron/status'
     | '/api/gridiron/workspace'
   fileRoutesByTo: FileRoutesByTo
@@ -120,6 +130,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/api/gridiron/advisor'
     | '/api/gridiron/connection'
+    | '/api/gridiron/context'
     | '/api/gridiron/status'
     | '/api/gridiron/workspace'
   id:
@@ -131,6 +142,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/api/gridiron/advisor'
     | '/api/gridiron/connection'
+    | '/api/gridiron/context'
     | '/api/gridiron/status'
     | '/api/gridiron/workspace'
   fileRoutesById: FileRoutesById
@@ -143,6 +155,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ApiGridironAdvisorRoute: typeof ApiGridironAdvisorRoute
   ApiGridironConnectionRoute: typeof ApiGridironConnectionRoute
+  ApiGridironContextRoute: typeof ApiGridironContextRoute
   ApiGridironStatusRoute: typeof ApiGridironStatusRoute
   ApiGridironWorkspaceRoute: typeof ApiGridironWorkspaceRoute
 }
@@ -198,6 +211,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGridironStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/gridiron/context': {
+      id: '/api/gridiron/context'
+      path: '/api/gridiron/context'
+      fullPath: '/api/gridiron/context'
+      preLoaderRoute: typeof ApiGridironContextRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/gridiron/connection': {
       id: '/api/gridiron/connection'
       path: '/api/gridiron/connection'
@@ -223,6 +243,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ApiGridironAdvisorRoute: ApiGridironAdvisorRoute,
   ApiGridironConnectionRoute: ApiGridironConnectionRoute,
+  ApiGridironContextRoute: ApiGridironContextRoute,
   ApiGridironStatusRoute: ApiGridironStatusRoute,
   ApiGridironWorkspaceRoute: ApiGridironWorkspaceRoute,
 }
