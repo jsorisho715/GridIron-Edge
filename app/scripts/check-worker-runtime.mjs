@@ -16,6 +16,7 @@ export async function checkWorkerRuntime(wranglerPackage) {
   try {
     const entry = join(dir, "check.ts"), bundle = join(dir, "check.js");
     writeFileSync(entry, `
+      import { handleAdvisor } from ${JSON.stringify(resolve("src/lib/advisor.server.ts"))};
       import { verifyESPN } from ${JSON.stringify(resolve("src/lib/espn-provider.server.ts"))};
       import { handleConnection } from ${JSON.stringify(resolve("src/lib/espn-connection.server.ts"))};
       import { syncWorkspace, handleWorkspace } from ${JSON.stringify(resolve("src/lib/workspace.server.ts"))};
@@ -23,13 +24,14 @@ export async function checkWorkerRuntime(wranglerPackage) {
       import { input, leagueFixture } from ${JSON.stringify(resolve("tests/fixtures/live.ts"))};
       export default { async fetch(request, env) {
         const path=new URL(request.url).pathname;
-        if(path==='/migrate'){const sql=${JSON.stringify(['0002_secure_espn.sql','0003_live_workspace.sql'].map(file=>readFileSync(resolve('migrations',file),'utf8').replace(/^--.*$/gm,'')).join('\n'))};await env.DB.batch(sql.split(';').map(s=>s.trim()).filter(Boolean).map(s=>env.DB.prepare(s)));return Response.json({migrated:true});}
+        if(path==='/migrate'){const sql=${JSON.stringify(['0002_secure_espn.sql','0003_live_workspace.sql','0004_decision_advisor.sql'].map(file=>readFileSync(resolve('migrations',file),'utf8').replace(/^--.*$/gm,'')).join('\n'))};await env.DB.batch(sql.split(';').map(s=>s.trim()).filter(Boolean).map(s=>env.DB.prepare(s)));return Response.json({migrated:true});}
         if(path==='/fixture')return Response.json(leagueFixture());
         if(path==='/seed'){
           await env.DB.prepare('INSERT INTO ge_espn_connection VALUES(1,?,?,?)').bind(await encryptConnection(env.CREDENTIAL_ENCRYPTION_KEY,input),JSON.stringify({leagueId:input.leagueId,teamId:input.teamId,season:input.season}),'runtime-revision').run();
           return Response.json({seeded:true});
         }
         if(path==='/api/gridiron/connection')return handleConnection(request,env);
+        if(path==='/api/gridiron/advisor')return handleAdvisor(request,env);
         if(path==='/api/gridiron/workspace')return handleWorkspace(request,env);
         if(path==='/scheduled')return Response.json(await syncWorkspace(env,fetch,true));
         try {
@@ -101,6 +103,8 @@ export async function checkWorkerRuntime(wranglerPackage) {
     const first=await post({action:'sync'});assert.equal(first.status,200);const result=await first.json();
     assert.equal(result.synced,true,JSON.stringify(result));assert.equal(result.workspace.snapshot.players.length,186);assert.equal(result.workspace.snapshot.slots.length,9);
     assert(!JSON.stringify(result).includes('synthetic-cookie'));assert.equal(result.workspace.snapshot.players[0].history.length,9);
+    assert.equal((await runtime.dispatchFetch(origin+'/api/gridiron/advisor')).status,401);
+    const advice=await runtime.dispatchFetch(origin+'/api/gridiron/advisor',{headers:{Cookie:cookie}});assert.equal(advice.status,200);const adviceData=await advice.json();assert.equal(adviceData.model,'gpt-5.6-luna');assert.equal(adviceData.configured,false);assert(Array.isArray(adviceData.decisions));
     const before=calls;assert.equal((await (await post({action:'sync'})).json()).reason,'cached');assert.equal(calls,before);
     assert.equal((await post({action:'preferences',updatedAt:0,notes:'Runtime test note'})).status,200);
     assert.equal((await post({action:'preferences',updatedAt:0,notes:'Stale note'})).status,409);

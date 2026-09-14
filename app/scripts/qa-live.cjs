@@ -16,6 +16,7 @@ process.on('exit',()=>devServer?.kill());
   const page=await context.newPage(),errors=[],audits=[];
   const generated=spawnSync('bun',['run','scripts/qa-fixture.ts'],{encoding:'utf8'});assert.equal(generated.status,0,generated.stderr);
   let state=JSON.parse(generated.stdout),locked=true,failSync=false,holdRead=false,releaseRead,readStarted;
+  let advisor=state.advisor;delete state.advisor;
   page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/api/gridiron/workspace',async route=>{
     if(locked)return route.fulfill({status:401,contentType:'application/json',body:JSON.stringify({error:'Unlock your private workspace.',code:'locked'})});
@@ -24,6 +25,13 @@ process.on('exit',()=>devServer?.kill());
     if(body?.action==='preferences'){state.preferences={...state.preferences,...body,updatedAt:Date.now()};result={preferences:state.preferences};}
     if(body?.action==='sync')result={synced:!failSync,workspace:state,...(failSync?{error:'Synthetic provider outage'}:{})};
     await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(result)});
+  });
+  await page.route('**/api/gridiron/advisor',route=>{
+    if(locked)return route.fulfill({status:401,contentType:'application/json',body:'{"error":"Locked"}'});
+    const body=route.request().postDataJSON();
+    if(body?.action==='decide'){const d=advisor.decisions.find(d=>d.id===body.id);d.status=body.status;}
+    if(body?.action==='configure')advisor={...advisor,configured:!!body.key||advisor.configured,enabled:body.enabled,risk:body.risk};
+    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(advisor)});
   });
   await page.route('**/api/gridiron/connection',route=>route.fulfill({status:200,contentType:'application/json',body:'{"ok":true}'}));
   const overflow=async()=>assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'Page overflows viewport');
@@ -34,6 +42,13 @@ process.on('exit',()=>devServer?.kill());
   await axe('locked');
   locked=false;await page.reload({waitUntil:'networkidle'});
   await page.getByRole('heading',{name:'This week. Your edge.'}).waitFor();await overflow();await axe('desktop-today');
+  await page.getByRole('heading',{name:'A clearer call. One decision at a time.'}).waitFor();
+  await page.locator('.ga-decision summary').first().click();await axe('decision-evidence');
+  await page.getByRole('button',{name:'Approve plan',exact:true}).first().click();await page.getByRole('heading',{name:'Your approved plans'}).waitFor();
+  assert.equal(advisor.decisions.filter(d=>d.status==='approved').length,1);
+  await page.getByRole('button',{name:'Mark done',exact:true}).first().click();
+  assert.equal(advisor.decisions.filter(d=>d.status==='completed').length,1);
+  if(await page.getByRole('button',{name:'Decline',exact:true}).count())await page.getByRole('button',{name:'Decline',exact:true}).first().click();
   await page.screenshot({path:'/tmp/gridiron-live-desktop.png',fullPage:true});
   await page.getByRole('button',{name:'Review lineup',exact:true}).click();await page.getByRole('dialog').waitFor();await axe('lineup-dialog');await page.keyboard.press('Escape');
   const desktopNav=page.getByRole('navigation',{name:'Main navigation'});
@@ -42,6 +57,12 @@ process.on('exit',()=>devServer?.kill());
   const select=page.getByRole('button',{name:/Select .* for comparison/});await select.nth(0).click();await select.nth(1).click();await page.getByRole('button',{name:'Compare players',exact:true}).click();await page.getByRole('heading',{name:'Make the clearer call.'}).waitFor();await axe('comparison-dialog');await page.keyboard.press('Escape');
   await page.getByRole('button',{name:/^Watch Alex/}).first().click();assert.equal(state.preferences.watched.length,1);
   await desktopNav.getByRole('button',{name:'Settings',exact:true}).click();await page.getByLabel('Private notes, synced across your devices').fill('Synthetic cross-device game plan');await page.getByRole('button',{name:'Save notes',exact:true}).click();await page.getByText('Notes saved across your devices.',{exact:true}).waitFor();assert.equal(state.preferences.notes,'Synthetic cross-device game plan');await axe('settings');
+  await page.getByLabel('OpenAI API key',{exact:true}).fill('sk-synthetic_browser_key_only_123456789');
+  await page.getByLabel('Automatically review material changes').check();
+  await page.getByRole('button',{name:'Save AI settings',exact:true}).click();
+  await page.getByText('Settings saved. Your key has been cleared from this form.',{exact:true}).waitFor();
+  assert.equal(await page.getByLabel('Replace OpenAI API key (optional)').inputValue(),'');
+  assert.equal(advisor.enabled,true);
   await page.reload({waitUntil:'networkidle'});assert.equal(await page.getByLabel('Private notes, synced across your devices').inputValue(),'Synthetic cross-device game plan');
   assert.equal(await page.evaluate(()=>localStorage.getItem('gridiron-sample-v1')),null);
   for(const width of [360,412,448]){

@@ -1,4 +1,5 @@
 export type GameLog = { season: number; week: number; points: number; projected: number | null };
+export type FutureGame = { week: number; opponent: string | null; kickoff: string | null; bye: boolean; known: boolean; projected: number | null };
 export type Slot = { id: string; espnId: number; label: string };
 export type LeaguePlayer = {
   id: string; name: string; position: string; proTeam: string; proTeamId: number;
@@ -6,6 +7,7 @@ export type LeaguePlayer = {
   status: string; availability: string; owned: number | null; locked: boolean; droppable: boolean;
   kickoff: string | null; opponent: string | null; bye: boolean; scheduleKnown: boolean;
   projected: number | null; actual: number | null; history: GameLog[];
+  future?: FutureGame[];
 };
 export type LeagueTeam = { id: number; name: string; wins: number; losses: number; ties: number; pointsFor: number; pointsAgainst: number; rank: number | null };
 export type Matchup = { homeId: number; awayId: number | null; homeScore: number | null; awayScore: number | null; week: number; endWeek: number };
@@ -15,6 +17,7 @@ export type Snapshot = {
   slots: Slot[]; rosterLimit: number; faab: number | null; acquiredAt: string;
   teams: LeagueTeam[]; players: LeaguePlayer[]; matchups: Matchup[]; warnings: string[];
   sources: { league: string; history: string | null; schedule: string | null; waivers: string | null };
+  tradeDeadline?: number | null;
 };
 export type Preferences = { watched: string[]; notes: string; reviewed: string[]; paused: boolean; updatedAt: number };
 export type Alert = { id: string; title: string; detail: string; playerId: string | null; kind: string; createdAt: number };

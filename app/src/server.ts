@@ -41,7 +41,12 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 export default {
   async scheduled(_event: unknown, env: unknown, ctx: { waitUntil: (promise: Promise<unknown>) => void }) {
     const { syncWorkspace } = await import('./lib/workspace.server');
-    ctx.waitUntil(syncWorkspace(env as import('./lib/espn-security.server').ConnectionEnv, fetch, true));
+    ctx.waitUntil((async()=>{
+      const bindings=env as import('./lib/espn-security.server').ConnectionEnv;
+      await syncWorkspace(bindings,fetch,true);
+      const {reviewAdvisor}=await import('./lib/advisor.server');
+      await reviewAdvisor(bindings);
+    })());
   },
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {

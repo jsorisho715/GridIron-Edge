@@ -6,6 +6,6 @@ This is the owner's private ESPN NFL companion, hosted on Cloudflare and backed 
 
 Keep the sage/forest interface accessible and usable on Pixel 8 Pro and desktop. `/` and `/app` use LiveWorkspace. ESPN access is read-only. Show missing/stale data honestly, and respect actual scoring, eligibility and kickoff locks.
 
-Credentials belong only in the existing encrypted server storage and deployment secret settings. Never print, export or commit them. Do not store real league payloads or private notes in tests or project documentation. Keep automated processing deterministic without LLM calls.
+Credentials belong only in the existing encrypted server storage and deployment secret settings. Never print, export or commit them. Do not store real league payloads or private notes in tests or project documentation. The owner now authorizes optional GPT-5.6 Luna reviews. Keep calculations deterministic; AI only ranks bounded evidence, behind encrypted opt-in and strict call limits.
 
 Use targeted tests for concrete risks; typecheck and build are required for application changes. Main branch changes under app/ trigger the full automatic deployment pipeline. Root documentation-only changes do not. Check the latest successful Actions run before describing deployment status. Record new decisions and validation concisely in the checkpoint/audit.

@@ -72,6 +72,15 @@ async function main() {
     for (const file of [sec, cfg]) { try { unlinkSync(file); } catch {} }
     try { rmdirSync(dir); } catch {}
   }
+  // Read back the independent scheduler resource after deployment. A cron in
+  // a config file alone is not evidence that Cloudflare registered it.
+  const schedulePath='/workers/scripts/'+name+'/schedules';
+  let schedules=(await api(schedulePath))?.schedules;
+  if(!Array.isArray(schedules)||!schedules.some(s=>s.cron==='*/15 * * * *')){
+    await api(schedulePath,'PUT',[{cron:'*/15 * * * *'}]);schedules=(await api(schedulePath))?.schedules;
+  }
+  check(Array.isArray(schedules)&&schedules.some(s=>s.cron==='*/15 * * * *'),'Cloudflare did not register the 15-minute scheduler.');
+  console.log('Cloudflare scheduler registration verified.');
   const origin = "https://" + name + "." + subdomain + ".workers.dev";
   const get = async path => {
     for(let attempt=0;attempt<3;attempt++){
@@ -119,6 +128,7 @@ async function main() {
   console.log('Production loading checks passed: '+assetsChecked+' install, script, style and font assets.');
   const privateStatus = await get("/api/gridiron/workspace");
   check(privateStatus.status === 401, "Private workspace must reject unauthenticated reads.");
+  check((await get('/api/gridiron/advisor')).status===401,'Private decisions must reject unauthenticated reads.');
   let cookie;
   const privateCall = async (path, body) => {
     const response = await fetch(origin + path, {
@@ -146,6 +156,10 @@ async function main() {
         const s = workspace.snapshot, mine = s.players.filter(p => p.teamId === s.teamId);
         check(s.leagueId === 10309566 && s.teamId === 25 && s.slots.length > 0, "Imported league identity or slots did not match this private app.");
         check(!JSON.stringify(workspace).includes('"espnS2"') && !JSON.stringify(workspace).includes('"envelope"'), "Private API exposed a credential field.");
+        const advice=await (await privateCall('/api/gridiron/advisor')).json();
+        check(Array.isArray(advice.decisions)&&advice.model==='gpt-5.6-luna','Decision engine failed to load.');
+        check(!JSON.stringify(advice).includes('"envelope"'),'Decision API exposed a credential field.');
+        console.log('Decision desk verified: '+JSON.stringify({decisions:advice.decisions.length,kinds:[...new Set(advice.decisions.map(d=>d.kind))],stale:advice.stale,aiConfigured:advice.configured,aiEnabled:advice.enabled,futureSchedule:mine.filter(p=>p.future?.some(g=>g.week>s.week&&g.known)).length}));
         console.log("Live league verified: " + JSON.stringify({ season: s.season, week: s.week, schedulerSeen: !!workspace.health.heartbeat, schedulerAgeMinutes: workspace.health.heartbeat?Math.round((Date.now()-workspace.health.heartbeat)/60000):null, teams: s.teams.length, roster: mine.length, slots: s.slots.length, pool: s.players.length, withHistory: mine.filter(p => p.history.length).length, withSchedule: mine.filter(p => p.scheduleKnown).length, withProjection: mine.filter(p => p.projected !== null).length, warnings: s.warnings }));
       }
     } else console.log("No ESPN connection saved; secure first-run screen verified.");

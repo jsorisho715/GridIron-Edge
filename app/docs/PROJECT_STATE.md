@@ -6,7 +6,7 @@ Updated September 14, 2026. Read this first; do not reconstruct the project from
 - One private ESPN NFL league: 10309566 / team 25 / season 2026.
 - Desktop and Pixel 8 Pro; light sage/forest decision desk; tap-first workflow.
 - Read-only ESPN, private/unlisted, no community feed, no automatic fantasy transactions.
-- Minimize manual upkeep and token use. No LLM dependency. Store compact durable state and bounded history.
+- Minimize manual upkeep and token use. Optional GPT-5.6 Luna review is now requested. Store compact durable state and bounded history; never resend unchanged decisions.
 - GitHub/Cloudflare infrastructure deployment and additive migrations are authorized. Never print or commit credentials.
 
 ## Hosting and access
@@ -46,3 +46,14 @@ Physical Pixel installation and closed-app push delivery still require the owner
 
 ## Continuation economy
 Read this file, inspect git status and latest Actions run, then only relevant code. Reuse test fixtures. Never save real league payloads, keys or cookies into notes, screenshots or logs. Check official provider code if schema changes; do not add more paid services or switch frameworks without a concrete need.
+
+## Decision desk update (September 14)
+- User now wants AI to prioritize plans with approve/decline memory. This supersedes the former no-LLM preference.
+- New decisions.ts handles whole-lineup plans, bounded waiver alternatives, conservative IR hold/activation reviews and bilateral one-for-one trade ideas. Future NFL schedules cover up to six weeks; trade baseline covers four.
+- IR return dates are unknown. No automated drop recommendation based only on current injury/zero projection. Healthy-player trade scenarios omit return forecasts, opponent difficulty and acceptance probabilities.
+- advisor.server.ts and migration 0004 add encrypted OpenAI key setup, structured factual review, result caching, decision memory, atomic budget reservations and stale/connection checks. Decisions are private at /api/gridiron/advisor.
+- Model: gpt-5.6-luna, low reasoning, 1,536 output token cap, bounded request bytes, at most four attempts/day and two hours apart. No automatic paid fallback or retries. No API key exists until owner enters one in Settings. Calculated suggestions work without it.
+- Response store:false; send only candidate facts, no cookies, league payload, private notes or chat history. Model selects factual evidence indexes, never generates unsupported claims or runs ESPN actions.
+- Approval records a plan. Owner still confirms moves in ESPN; marking done is owner-reported, never an inferred transaction.
+- New tests cover cost caps, concurrency, caching across approvals, invalid model outputs, redirects, stale data, trade benefit for both teams and IR uncertainty. Browser checks include decision details, approvals and secure setup.
+- Existing hourly health run 34871941529 reported a missing Cloudflare heartbeat. Deployment now reads back and repairs missing cron registration. Do not claim a production heartbeat until observed.

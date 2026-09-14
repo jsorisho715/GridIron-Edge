@@ -17,6 +17,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiGridironWorkspaceRouteImport } from './routes/api/gridiron/workspace'
 import { Route as ApiGridironStatusRouteImport } from './routes/api/gridiron/status'
 import { Route as ApiGridironConnectionRouteImport } from './routes/api/gridiron/connection'
+import { Route as ApiGridironAdvisorRouteImport } from './routes/api/gridiron/advisor'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -58,6 +59,11 @@ const ApiGridironConnectionRoute = ApiGridironConnectionRouteImport.update({
   path: '/api/gridiron/connection',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGridironAdvisorRoute = ApiGridironAdvisorRouteImport.update({
+  id: '/api/gridiron/advisor',
+  path: '/api/gridiron/advisor',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/connections': typeof ConnectionsRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/api/gridiron/advisor': typeof ApiGridironAdvisorRoute
   '/api/gridiron/connection': typeof ApiGridironConnectionRoute
   '/api/gridiron/status': typeof ApiGridironStatusRoute
   '/api/gridiron/workspace': typeof ApiGridironWorkspaceRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/connections': typeof ConnectionsRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/api/gridiron/advisor': typeof ApiGridironAdvisorRoute
   '/api/gridiron/connection': typeof ApiGridironConnectionRoute
   '/api/gridiron/status': typeof ApiGridironStatusRoute
   '/api/gridiron/workspace': typeof ApiGridironWorkspaceRoute
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/connections': typeof ConnectionsRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/api/gridiron/advisor': typeof ApiGridironAdvisorRoute
   '/api/gridiron/connection': typeof ApiGridironConnectionRoute
   '/api/gridiron/status': typeof ApiGridironStatusRoute
   '/api/gridiron/workspace': typeof ApiGridironWorkspaceRoute
@@ -98,6 +107,7 @@ export interface FileRouteTypes {
     | '/connections'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/api/gridiron/advisor'
     | '/api/gridiron/connection'
     | '/api/gridiron/status'
     | '/api/gridiron/workspace'
@@ -108,6 +118,7 @@ export interface FileRouteTypes {
     | '/connections'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/api/gridiron/advisor'
     | '/api/gridiron/connection'
     | '/api/gridiron/status'
     | '/api/gridiron/workspace'
@@ -118,6 +129,7 @@ export interface FileRouteTypes {
     | '/connections'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/api/gridiron/advisor'
     | '/api/gridiron/connection'
     | '/api/gridiron/status'
     | '/api/gridiron/workspace'
@@ -129,6 +141,7 @@ export interface RootRouteChildren {
   ConnectionsRoute: typeof ConnectionsRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ApiGridironAdvisorRoute: typeof ApiGridironAdvisorRoute
   ApiGridironConnectionRoute: typeof ApiGridironConnectionRoute
   ApiGridironStatusRoute: typeof ApiGridironStatusRoute
   ApiGridironWorkspaceRoute: typeof ApiGridironWorkspaceRoute
@@ -192,6 +205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGridironConnectionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/gridiron/advisor': {
+      id: '/api/gridiron/advisor'
+      path: '/api/gridiron/advisor'
+      fullPath: '/api/gridiron/advisor'
+      preLoaderRoute: typeof ApiGridironAdvisorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -201,6 +221,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConnectionsRoute: ConnectionsRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ApiGridironAdvisorRoute: ApiGridironAdvisorRoute,
   ApiGridironConnectionRoute: ApiGridironConnectionRoute,
   ApiGridironStatusRoute: ApiGridironStatusRoute,
   ApiGridironWorkspaceRoute: ApiGridironWorkspaceRoute,
