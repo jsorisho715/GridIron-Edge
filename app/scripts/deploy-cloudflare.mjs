@@ -13,6 +13,8 @@ async function api(path, method = "GET", body) {
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   const data = await r.json().catch(() => ({}));
+  if (method === "GET" && path === "/workers/subdomain" && r.status === 404 &&
+      (data.errors || []).some(e => e.code === 10007)) return null;
   check(r.ok && data.success !== false, "Cloudflare " + method + " " + path.split("?")[0] + " returned HTTP " + r.status + "; codes " + (data.errors || []).map(e => e.code).join(",") + ". Check the token permissions and account.");
   return data.result;
 }
@@ -21,7 +23,13 @@ async function main() {
   check(owner && owner.length >= 32 && owner.length <= 256, "OWNER_ACCESS_KEY must be 32 to 256 characters.");
   check(/^[a-fA-F0-9]{64}$/.test(encryption || ""), "CREDENTIAL_ENCRYPTION_KEY must be exactly 64 hex characters.");
   check(/^[a-z][a-z0-9-]{2,40}$/.test(name), "Invalid Worker name.");
-  const subdomain = (await api("/workers/subdomain"))?.subdomain;
+  let subdomain = (await api("/workers/subdomain"))?.subdomain;
+  if (!subdomain) {
+    // Only provision an absent address; never rename an existing account address.
+    subdomain = (await api("/workers/subdomain", "PUT", {
+      subdomain: name + "-" + account.slice(0, 8)
+    }))?.subdomain;
+  }
   check(subdomain && /^[a-z0-9-]+$/.test(subdomain), "Set up a workers.dev subdomain in Cloudflare Workers & Pages, then rerun deployment.");
   let db;
   for (let page = 1; page <= 20; page++) {
