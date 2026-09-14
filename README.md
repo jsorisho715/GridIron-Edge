@@ -43,4 +43,6 @@ Production Worker: `gridiron-edge`. D1: `gridiron-edge-db`, binding `DB`. Deploy
 
 ## Project memory
 
+See [RELEASE_AUDIT.md](RELEASE_AUDIT.md) for the verified live release, exact coverage and remaining device checks.
+
 Read `app/docs/PROJECT_STATE.md` first, then relevant source. `app/docs/PRD.md` records scope and decisions, `QA.md` records verification, and `DATA_SOURCES.md` records API and repository choices. Routine operation uses no LLM calls or tokens.
