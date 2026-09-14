@@ -7,6 +7,7 @@ A personal ESPN NFL fantasy companion for desktop and Pixel 8 Pro, built with Re
 
 - Owner login, encrypted ESPN cookies, private API and no private page caching.
 - Live league rosters, scoring rules, matchups, standings, free-agent availability and player history.
+- A decision queue for complete lineup plans, waiver alternatives, conservative IR reviews and bilateral trade ideas. Approve/decline memory persists across devices.
 - Read-only lineup optimization, player comparisons, historical estimates and walk-forward baseline checks.
 - Availability changes, pre-kickoff alerts, watchlists and private notes across devices.
 - Automatic sync every 15 minutes, bounded retries, preserved last-good data and independent hourly health checks.
@@ -35,7 +36,7 @@ A push to `main` under `app/` runs tests, build, dependency audit, browser/acces
 
 GitHub Actions secrets: `CLOUDFLARE_API_TOKEN`, `OWNER_ACCESS_KEY` (32–256 characters), `CREDENTIAL_ENCRYPTION_KEY` (64 hex characters). Variables: `CLOUDFLARE_ACCOUNT_ID`, `APP_SLUG=gridiron-edge`, `HF_ENV=production`.
 
-These are already configured. No additional notification keys are needed: VAPID keys are generated and encrypted automatically. Enter ESPN cookies only in `/connections`. Keep keys in a password manager, never in this public repository, logs or chat.
+These are already configured. Optional AI reviews require an OpenAI API key entered only in the app’s AI settings; it is encrypted in D1 and does not require another environment variable. No additional notification keys are needed: VAPID keys are generated and encrypted automatically. Enter ESPN cookies only in `/connections`. Keep keys in a password manager, never in this public repository, logs or chat.
 
 To recover owner access, replace only `OWNER_ACCESS_KEY` in GitHub and rerun deployment. Rotating the encryption key makes existing credentials and notification subscriptions unreadable. See `app/docs/SECURE_CONNECTIONS.md`.
 
@@ -45,4 +46,4 @@ Production Worker: `gridiron-edge`. D1: `gridiron-edge-db`, binding `DB`. Deploy
 
 See [RELEASE_AUDIT.md](RELEASE_AUDIT.md) for the verified live release, exact coverage and remaining device checks.
 
-Read `app/docs/PROJECT_STATE.md` first, then relevant source. `app/docs/PRD.md` records scope and decisions, `QA.md` records verification, and `DATA_SOURCES.md` records API and repository choices. Routine operation uses no LLM calls or tokens.
+Read `app/docs/PROJECT_STATE.md` first, then relevant source. `app/docs/PRD.md` records scope and decisions, `QA.md` records verification, and `DATA_SOURCES.md` records API and repository choices. Statistical processing uses no model tokens. Optional GPT-5.6 Luna reviews reuse saved results and have explicit daily limits. See [AI_DECISIONS.md](AI_DECISIONS.md).

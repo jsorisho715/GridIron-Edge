@@ -1,4 +1,4 @@
-import { writeFileSync, appendFileSync, mkdtempSync, unlinkSync, rmdirSync } from "node:fs";
+import { writeFileSync, appendFileSync, mkdtempSync, unlinkSync, rmdirSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -117,8 +117,20 @@ async function main() {
   const html = await get("/connections");
   check(html.ok && (await html.text()).includes("Secure connections"), "Connection screen smoke check failed.");
   // Check deployed entry pages, install assets and their first-party CSS/font/JS references.
-  const pageResponse=await get('/app');
-  check(pageResponse.ok,'Workspace page failed to load.');const pageHTML=await pageResponse.text();
+  let pageHTML='',currentPage=false;
+  // Worker code and static assets can reach an edge at different moments.
+  // Require this build's asset names before auditing them, never accept stale HTML.
+  for(let attempt=0;attempt<12;attempt++){
+    const response=await get('/app');
+    if(response.ok){
+      pageHTML=await response.text();
+      const refs=[...pageHTML.matchAll(/(?:href|src)="(\/assets\/[^"?#]+)"/g)].map(m=>m[1]);
+      currentPage=refs.length>0&&refs.every(path=>existsSync(resolve('dist/client'+path)));
+      if(currentPage)break;
+    }else await response.body?.cancel();
+    await new Promise(resolve=>setTimeout(resolve,5000));
+  }
+  check(currentPage,'Workspace HTML did not converge to the current deployed build.');
   const paths=new Set(['/manifest.webmanifest','/sw.js','/offline.html','/icon-192.png','/icon-512.png','/robots.txt']);
   for(const match of pageHTML.matchAll(/(?:href|src)="(\/assets\/[^"?#]+)"/g))paths.add(match[1]);
   let assetsChecked=0;
