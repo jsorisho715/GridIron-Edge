@@ -8,3 +8,10 @@ test('backup collector uses only fixed public hosts, strips bulky metadata and a
   snapshot.intel.headlines.checkedAt=snapshot.intel.nfl.injuryFeed.checkedAt=snapshot.intel.nfl.marketFeed.checkedAt=Date.now() as never;
   expect(await collectPublicContext(snapshot,transport)).toBeNull();expect(urls).toHaveLength(3);
 });
+test('backup collector preserves cached context when one public feed is blocked',async()=>{
+  const snapshot={acquiredAt:new Date().toISOString(),intel:{headlines:{checkedAt:null},nfl:{injuryFeed:{checkedAt:null},marketFeed:{checkedAt:null},gameWindow:'20260910-20260915'}}};
+  const transport=async(url:string)=>url.endsWith('/injuries')?new Response('',{status:403}):Response.json(url.includes('/news?')?{articles:[]}:{events:[]});
+  const bundle=await collectPublicContext(snapshot,transport);
+  expect(bundle).not.toBeNull();expect(bundle.sources.injuries).toBeUndefined();expect(bundle.sources.news).toBeDefined();expect(bundle.errors).toHaveLength(1);
+  expect(await collectPublicContext(snapshot,async()=>new Response('',{status:403}))).toBeNull();
+});

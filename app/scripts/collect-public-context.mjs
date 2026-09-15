@@ -9,8 +9,9 @@ export async function collectPublicContext(snapshot, transport = fetch, now = Da
   if (due(nfl.injuryFeed)) paths.push(['injuries', 'injuries']);
   if (due(nfl.marketFeed) && /^\d{8}-\d{8}$/.test(nfl.gameWindow)) paths.push(['games', 'scoreboard?limit=100&dates=' + nfl.gameWindow]);
   if (!paths.length) return null;
-  const result = { expectedSnapshot: snapshot.acquiredAt, gameWindow: nfl.gameWindow, collectedAt: now, sources: {} };
+  const result = { expectedSnapshot: snapshot.acquiredAt, gameWindow: nfl.gameWindow, collectedAt: now, sources: {}, errors: [] };
   await Promise.all(paths.map(async ([key,path]) => {
+    try {
     const response = await transport('https://site.api.espn.com/apis/site/v2/sports/football/nfl/' + path, { headers: { Accept: 'application/json' }, redirect: 'manual', signal: AbortSignal.timeout(30000) });
     if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) { await response.body?.cancel(); throw new Error(`Public ${key} feed returned HTTP ${response.status}.`); }
     const reader = response.body.getReader(), chunks = []; let size = 0;
@@ -29,7 +30,11 @@ export async function collectPublicContext(snapshot, transport = fetch, now = Da
       if (!Array.isArray(raw.events)) throw new Error('Public game schema changed.');
       result.sources.games = { events: raw.events.slice(0,100).map(e=>({id:e.id,date:e.date,competitions:rows(e.competitions).slice(0,1).map(c=>({competitors:rows(c.competitors).slice(0,2).map(t=>({id:t.id,homeAway:t.homeAway,team:{abbreviation:text(t.team?.abbreviation)}})),status:{type:{state:c.status?.type?.state??e.status?.type?.state}},odds:rows(c.odds).slice(0,1).map(o=>({overUnder:o.overUnder,details:text(o.details),provider:{name:text(o.provider?.displayName??o.provider?.name)}}))}))})) };
     }
+    } catch (error) {
+      result.errors.push(`${key}: ${error instanceof Error ? error.message : 'request failed'}`.slice(0,180));
+    }
   }));
+  if (!Object.keys(result.sources).length) return null;
   if (new TextEncoder().encode(JSON.stringify(result)).length > 500000) throw new Error('Normalized public context exceeded the upload limit.');
   return result;
 }
@@ -37,6 +42,7 @@ export async function refreshPublicContext(data, call, transport = fetch) {
   if (data.preferences?.paused) return data;
   const bundle = await collectPublicContext(data.snapshot, transport);
   if (!bundle) return data;
+  if (bundle.errors.length) console.log('Public context kept cached data for: ' + bundle.errors.map(e=>e.split(':')[0]).join(', '));
   const result = await (await call('/api/gridiron/context', bundle)).json();
   if (!result.updated) throw new Error('Public context could not be saved against the current league snapshot.');
   return (await (await call('/api/gridiron/workspace')).json());
