@@ -1,6 +1,6 @@
 # Gridiron Edge checkpoint
 
-Updated September 14, 2026. Read this first; do not reconstruct the project from chat. This file supersedes earlier Higgsfield/sample-only notes.
+Updated September 15, 2026. Read this first; do not reconstruct the project from chat. This file supersedes earlier Higgsfield/sample-only notes.
 
 ## Owner decisions
 - One private ESPN NFL league: 10309566 / team 25 / season 2026.
@@ -40,7 +40,7 @@ Updated September 14, 2026. Read this first; do not reconstruct the project from
 - Legacy gridiron.ts, Workspace.tsx and panels.tsx remain unused scaffold. Never silently reintroduce their sample data.
 
 ## Validation and limits
-66 tests passed locally, typecheck/build/audit clean. Browser flows passed at 360/412/448/1440px with no page errors or tested accessibility violations. workerd gate verifies migrations, encryption, owner sessions, live import, caching, conflicts, scheduler and encrypted Web Push with synthetic data. Production verification occurs in the deployment workflow; inspect its latest result before claiming deployment success.
+69 tests and 552 assertions passed in the release pipeline; typecheck/build/audit were clean. Browser flows passed at 360/412/448/1440px with no page errors or tested accessibility violations. The workerd gate verifies migrations, encryption, owner sessions, live import, caching, conflicts, scheduler and encrypted Web Push with synthetic data. Production verification occurs in the deployment workflow; inspect its latest result before claiming deployment success.
 
 Physical Pixel installation and closed-app push delivery still require the owner. Predictions are uncalibrated estimates; history backtest checks the weighted baseline only. Availability flags can lag ESPN. Do not claim all NFL players are searchable, full news coverage, guaranteed accuracy, unlimited free hosting or 100% uptime.
 
@@ -60,7 +60,7 @@ Read this file, inspect git status and latest Actions run, then only relevant co
 
 - Production release 1e3bccf passed on run 34885098918 at 19:10 UTC: 42 assets, 12 teams, 16 roster players with history/current projection/future schedule, 0 supported decisions in week 1. No AI key configured. Primary Cloudflare heartbeat still absent; health workflow now supplies independent backup refresh with an explicit degraded-primary warning.
 
-## Player intelligence update (implementation complete, deployment pending)
+## Player intelligence update (deployed and verified September 14)
 - Requirements and source audit: `INTELLIGENCE_PLAN.md`. The owner clarified that memory means runtime player/injury/decision history, not just project documentation.
 - Tap-to-expand explanations, ESPN owner-name allowlist, player headshots with fallback, Opponents desk with tagged news and confirmed-vs-observed activity.
 - Usage stats come from existing completed game rows. Hot/cooling requires six same-season games and sustained opportunity changes; no last-season Hot badge in week one.
@@ -68,4 +68,7 @@ Read this file, inspect git status and latest Actions run, then only relevant co
 - `league-intel.ts/server.ts`: one transaction request per 15min; three shared public feeds per 30min. Current ESPN injury response was 8.8MB; accept at most 12MB only for that endpoint, immediately discard expanded metadata and retain normalized facts. Credentials only reach the private league host.
 - `player-memory.server.ts` + migration0005: indexed D1 change records (180d/up to10000 per scope) and true pregame forecasts (2yr), settled from completed-game logs with later scoring corrections. JSON batches of100 keep first-import database request counts bounded. Player detail lazily reads at most24 events/18 forecasts. Decision statuses/reasons saved against every involved player.
 - Model receives at most two matchup facts and two memory facts per candidate. A shared fact dictionary removes duplicate evidence/cautions. Source freshness changes affect facts; cosmetic photos, manager names and unchanged timestamps do not. Paid budgets unchanged. An oversized shortlist sets an explicit no-spend status with a2h retry delay.
-- Local gates:66tests/511assertions, typecheck/build, realworkerd with JSONbatch migration/import, and12browser accessibility states passed at360/412/448/1440px. Missing headshot, ownership explanation, opponent filters, manager labels and memory results exercised. Real league coverage will be recorded after deployment.
+- Release gates: 69 tests/552 assertions, typecheck/build, real workerd with JSON batch migration/import, and 12 browser accessibility states passed at 360/412/448/1440px. Missing headshot, ownership explanation, opponent filters, manager labels and memory results were exercised.
+- Production coverage: 12 manager names, 6 transactions, 50 headlines, 800 NFL injury entries, 15 games and no public feed errors. Three sampled headshots loaded.
+- Cloudflare's primary scheduler heartbeat and the independent GitHub backup were both healthy in monitor run 34914931645. The owner saved and verified the optional OpenAI key on September 15; an automated monitor run must confirm its configured/enabled state independently.
+- Individual live NFL player props remain outside the product because current reliable providers require a paid production plan. Scrambled trial data is not suitable for decisions. Free nflverse snap/depth data remains a possible later integration after safe identity matching and freshness validation.
