@@ -72,3 +72,10 @@ Read this file, inspect git status and latest Actions run, then only relevant co
 - Production coverage: 12 manager names, 6 transactions, 50 headlines, 800 NFL injury entries, 15 games and no public feed errors. Three sampled headshots loaded.
 - Cloudflare's primary scheduler heartbeat and the independent GitHub backup were both healthy in monitor run 34914931645. The owner saved and verified the optional OpenAI key on September 15; an automated monitor run must confirm its configured/enabled state independently.
 - Individual live NFL player props remain outside the product because current reliable providers require a paid production plan. Scrambled trial data is not suitable for decisions. Free nflverse snap/depth data remains a possible later integration after safe identity matching and freshness validation.
+
+## Usability release (September 15)
+- Four primary sections replace the former eight-item navigation: Today, My team, Players and League. Roster/opponents/updates, all players/waivers and standings/settings use short contextual tabs.
+- Today leads with a maximum of three verdict-first decisions, plain one-sentence impact, Approve/Skip controls and evidence behind Why. Zero supported moves reads “Your lineup looks good.”
+- A compact briefing labels the current weekly phase and a deterministic Play safe/Balanced/Chase upside posture from the projected lineup gap. It is not labeled as win probability.
+- Player detail uses Overview, Why, News and History tabs. The default view shows only predicted points, recent range, kickoff, opponent and plain-language ESPN ownership.
+- Synthetic browser coverage verifies the four-section workflow, three-card limit, contextual tabs, player details, approval history and settings at 360/412/448/1440px with no tested accessibility violations or page errors.
