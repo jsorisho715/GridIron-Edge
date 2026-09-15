@@ -1,11 +1,11 @@
 # Gridiron Edge: live release audit
 
-Player intelligence release verified September 14, 2026, at 21:44 UTC. Cloudflare's primary scheduler and the independent backup were both healthy in the latest completed monitor run on September 15, 2026, at 00:52 UTC.
+Usability release verified September 15, 2026, at 04:03 UTC. Cloudflare's primary scheduler and the independent backup are healthy.
 
-[Open the app](https://gridiron-edge.gridiron-edge-2b093f15.workers.dev/app) · [Successful deployment](https://github.com/jsorisho715/GridIron-Edge/actions/runs/34900267816) · [Healthy scheduler](https://github.com/jsorisho715/GridIron-Edge/actions/runs/34914931645)
+[Open the app](https://gridiron-edge.gridiron-edge-2b093f15.workers.dev/app) · [Successful deployment](https://github.com/jsorisho715/GridIron-Edge/actions/runs/34927192745) · [Healthy scheduler](https://github.com/jsorisho715/GridIron-Edge/actions/runs/34914931645)
 
-Application commit: `8cea6359152ed42add63439e33ea86f425e663a7`.
-Cloudflare version: `1b4cc302-674d-4ab2-a0d5-4371948f5fa2`.
+Application commit: `f1e19bd72cca6ad9d98be4c60d00ba349c760325`.
+Cloudflare version: `e27578ad-e111-48a0-a48b-a40a15c28ef1`.
 Subsequent documentation-only commits do not change the deployed application.
 
 ## Verified results
@@ -17,13 +17,13 @@ Subsequent documentation-only commits do not change the deployed application.
 | Player data | All 16 roster players have completed-game history, NFL schedule data ESPN weekly projections and future NFL schedule coverage |
 | Provider warnings | None returned in the verified snapshot |
 | Live static loading | All 42 checked installation, JavaScript, CSS and font assets loaded |
-| Tests | 69 passing tests, 552 assertions |
+| Tests | 70 passing tests |
 | Typecheck / production build / dependency audit | Passed |
 | Browser workflows | Passed at 360, 412, 448 and 1440px; no horizontal overflow or page errors in tested flows |
 | Automated accessibility | No WCAG A/AA violations across 12 audited states |
 | Workerd runtime | D1 migrations, encrypted import, owner sessions, request caching, conflict protection, scheduler code and encrypted Web Push passed with synthetic upstream data |
-| Decision desk | Private API loads; current week 1 snapshot produced zero supported upgrades. The owner saved and verified an OpenAI key on September 15; the next scheduled monitor supplies independent confirmation of its configured/enabled state. |
-| Player intelligence | 12 manager names, 6 transactions, 50 headlines, 800 NFL injury entries and 15 NFL games loaded with no feed errors; sampled headshots loaded successfully. |
+| Decision desk | Private API loads; current week 1 snapshot produced zero supported upgrades. The encrypted OpenAI key is configured; automatic review is currently disabled. |
+| Player intelligence | 12 manager names, 6 transactions, 49 headlines, 800 NFL injury entries and 15 NFL games loaded with no feed errors; sampled headshots loaded successfully. |
 | Decision controls | Synthetic browser flows verify evidence expansion, approval, completion, decline and secure key form clearing. Unit tests verify persisted choices, cache reuse, stale data and concurrency protections. |
 | Privacy | Anonymous live workspace access rejected; transient release-check session revoked; no private payloads or credentials logged |
 
@@ -50,6 +50,10 @@ No new environment variables or ESPN cookies are needed. The owner saved and ver
 Current game spreads and totals are included through ESPN. Reliable live NFL player props require a paid production feed; current free trials either scramble live data or exclude NFL/props. The app does not ingest misleading trial data. Free nflverse snap counts and depth charts are candidates for a later data-quality release, but they require cross-provider player identity matching and freshness checks before they can safely influence decisions.
 
 ## Audit fixes
+
+The usability release reduces the primary navigation to Today, My team, Players and League; caps Today at three verdict-first recommendations; moves evidence behind Why; adds contextual sub-tabs; and divides player detail into Overview, Why, News and History. A deterministic matchup posture is presented as Play safe, Balanced or Chase upside without claiming a calibrated win probability.
+
+The release collector now preserves cached injury/news/market context when one optional public ESPN request is temporarily blocked. Successful sources continue refreshing and the deployment no longer fails after the Worker has safely deployed.
 
 The decision release adds strict model output validation, encrypted AI key storage, durable approval memory, token reservations, future schedules, conservative IR reasoning and bilateral trade checks. Deployment now waits for HTML references to match the current asset build, resolving the mixed-version rollout caught in run 34884627103.
 
