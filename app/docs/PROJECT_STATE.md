@@ -1,5 +1,10 @@
 # Gridiron Edge checkpoint
 
+## Trash talk addition (September 16)
+- My team → Opponents → Talk trash works for every league opponent in the picker.
+- Two local template tones, editable draft, non-repeating six-message rotation per tone, copy success/failure feedback. No model tokens, external send, fabricated stats or injury jokes. Drafts are ephemeral and reset when switching opponents.
+- Implementation: `trash-talk.ts`, `TrashTalk.tsx`. All 72 tests pass; typecheck/build pass; browser flows pass at 360/412/448/1440px with 13 clean accessibility states. Coverage includes all opponent IDs, fallback names, rotation, editing, copying and clipboard denial. Production verification pending.
+
 Updated September 15, 2026. Read this first; do not reconstruct the project from chat. This file supersedes earlier Higgsfield/sample-only notes.
 
 ## Owner decisions

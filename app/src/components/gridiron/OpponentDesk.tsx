@@ -5,6 +5,7 @@ import { activityText, currentOpponent, managerLabel, opponentPlan, teamActivity
 import { Explain } from './Explain';
 import { UsageBadge } from './PlayerUsage';
 import { PlayerPhoto } from './PlayerPhoto';
+import { TrashTalk } from './TrashTalk';
 
 const date = (n: number | string | null | undefined) => n ? new Date(n).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'Not yet available';
 const points = (n: number | null) => n === null ? 'No estimate' : n.toFixed(1) + ' pts';
@@ -37,6 +38,7 @@ export function OpponentDesk({ snapshot: s, onPlayer, onLineup }: { snapshot: Sn
       {s.teams.filter(t => t.id !== s.teamId).map(t => <option key={t.id} value={t.id}>{t.name} · {managerLabel(t)}{t.id === current?.id ? ' · This week' : ''}</option>)}
     </select></div>
     <section className="ge-card gi-team-header"><div><span className="ge-eyebrow">{team.id === current?.id ? 'YOUR MATCHUP THIS WEEK' : 'LEAGUE OPPONENT'}</span><h2>{team.name}</h2><p className="gi-manager">Managed by {managerLabel(team)}</p><p className="ge-footnote">{team.wins} wins · {team.losses} losses · {team.ties} ties</p></div><a className="ge-button secondary" href={link} target="_blank" rel="noreferrer">View their ESPN team<ArrowUpRight size={17} /></a></section>
+    <TrashTalk key={team.id} team={team} />
     {plan && <section className="ge-card gi-plan gi-plan-main"><span className="ge-eyebrow">WHAT YOU SHOULD DO NEXT</span><h2>{plan.title}</h2><p>{plan.reason}</p><p>{plan.context}</p><p>{plan.caution}</p>
       <p className="ge-footnote">{plan.changes.length ? `${plan.changes.length} recent roster updates in the saved activity. Recommendations use their current roster and your available options after each refresh.` : 'No recent roster changes in the saved activity. We reassess after each league refresh.'}</p>
       {plan.actionable && <button className="ge-button" onClick={onLineup}>Show my possible changes<ArrowsLeftRight size={18} /></button>}

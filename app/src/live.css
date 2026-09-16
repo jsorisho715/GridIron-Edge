@@ -1310,6 +1310,14 @@
   color: #52675a;
   font-size: 12px;
 }
+.gi-trash-talk { margin-block: 16px; padding: 20px; }
+.gi-trash-talk summary { cursor: pointer; min-height: 44px; align-content: center; font-weight: 700; }
+.gi-trash-talk summary span { display: block; font-weight: 400; font-size: 13px; }
+.gi-trash-body { display: grid; gap: 12px; padding-top: 16px; }
+.gi-trash-body textarea { width: 100%; min-height: 140px; resize: vertical; padding: 14px; font: inherit; line-height: 1.6; border: 1px solid #728779; border-radius: 12px; color: #203e2c; background: #fff; }
+.gi-trash-body select { min-height: 44px; width: 100%; }
+.gi-trash-body p { margin: 0; }
+.gi-trash-body .ge-actions { flex-wrap: wrap; }
 .gi-history > div p {
   margin: 0;
 }
