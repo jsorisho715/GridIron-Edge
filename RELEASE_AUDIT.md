@@ -1,5 +1,9 @@
 # Gridiron Edge: live release audit
 
+## Latest additive release: September 16, 2026
+
+Opponent trash talk is deployed in application commit `919dcd70e56cee10b00d0cd2e1d7502b85e0092c`. [Deployment and production verification](https://github.com/jsorisho715/GridIron-Edge/actions/runs/35133091378) succeeded. All 72 tests, typecheck, build, dependency audit, browser checks and runtime/deployment verification passed. The browser suite now covers 13 clean accessibility states at 360/412/448/1440px, including editable drafts, copying, clipboard denial and opponent switching. Drafts use zero-token local templates, never send automatically and reset between opponents. The previous release audit below remains the historical baseline.
+
 Usability release verified September 15, 2026, at 04:03 UTC. Cloudflare's primary scheduler and the independent backup are healthy.
 
 [Open the app](https://gridiron-edge.gridiron-edge-2b093f15.workers.dev/app) · [Successful deployment](https://github.com/jsorisho715/GridIron-Edge/actions/runs/34927192745) · [Healthy scheduler](https://github.com/jsorisho715/GridIron-Edge/actions/runs/34914931645)
