@@ -1,5 +1,11 @@
 # Gridiron Edge: live release audit
 
+## Trade clarity release: September 18, 2026
+
+Application commit `78ae493f1fcdb45ed828b2d350af840f066028cb` deployed and verified in [successful run 35292009617](https://github.com/jsorisho715/GridIron-Edge/actions/runs/35292009617). Trade cards identify the manager and team, compare incoming/outgoing players and both lineup gains, explain NFL schedules, and distinguish saving a plan from executing a trade. Recommendations require positive gains for both teams and at least a rounded 0.5-point larger gain for the owner over the modeled period. Model uncertainty remains visible. No additional model input or paid calls are added by the display metadata.
+
+All 72 tests / 666 assertions, typecheck, build, dependency audit, browser/accessibility checks and runtime/production verification passed. Synthetic trade UI tests cover manager names, two-sided gains, full NFL opponent names, byes, saving plans and 360/412/448/1440px layouts. All 15 audited accessibility states passed. Prior release audits below are historical baselines.
+
 ## Latest additive release: September 16, 2026
 
 Opponent trash talk is deployed in application commit `919dcd70e56cee10b00d0cd2e1d7502b85e0092c`. [Deployment and production verification](https://github.com/jsorisho715/GridIron-Edge/actions/runs/35133091378) succeeded. All 72 tests, typecheck, build, dependency audit, browser checks and runtime/deployment verification passed. The browser suite now covers 13 clean accessibility states at 360/412/448/1440px, including editable drafts, copying, clipboard denial and opponent switching. Drafts use zero-token local templates, never send automatically and reset between opponents. The previous release audit below remains the historical baseline.

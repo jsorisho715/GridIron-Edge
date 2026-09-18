@@ -5,7 +5,7 @@
 - Structured trade metadata is deterministic and excluded from the compact AI prompt. Existing paid call caps remain unchanged. Versioned evidence invalidates older candidate caches.
 - Both sides must retain the risk-specific minimum gain; the owner's projected improvement must exceed the partner's by at least 0.5 points (rounded) over the modeled window. This is lineup utility, not market value or acceptance probability. No guaranteed advantage is claimed.
 - Save trade plan records intent only; the ESPN link opens the partner's team. All cautions remain available. Names use current league metadata without forcing paid reviews for cosmetic changes.
-- Local validation: 72 tests / 666 assertions, typecheck/build, 15 accessibility states and browser flows at 360/412/448/1440px passed. Production verification pending.
+- Validation: 72 tests / 666 assertions, typecheck/build, 15 accessibility states and browser flows at 360/412/448/1440px passed. Production deploy and verification succeeded in run 35292009617, application commit 78ae493f1fcdb45ed828b2d350af840f066028cb.
 
 ## Trash talk addition (September 16)
 - My team → Opponents → Talk trash works for every league opponent in the picker.
