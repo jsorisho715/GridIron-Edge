@@ -215,6 +215,25 @@ process.on("exit", () => devServer?.kill());
   await page.getByRole("dialog").waitFor({ state: "hidden" });
   const desktopNav = page.getByRole("navigation", { name: "Main navigation" });
   await desktopNav.getByRole("button", { name: /^My team/ }).click();
+  await page.getByRole('button',{name:'Matchup',exact:true}).click();
+  await page.getByRole('heading',{name:'Your matchup command center.',exact:true}).waitFor();
+  await page.getByRole('region',{name:'Matchup scoreboard'}).waitFor();
+  await page.getByRole('heading',{name:'Every starter, side by side',exact:true}).waitFor();
+  await axe('matchup-desktop');
+  await page.screenshot({path:'/tmp/gridiron-matchup-desktop.png',fullPage:true});
+  await page.locator('.gm-lineup-pair .gm-player').first().click();
+  await page.getByRole('dialog').waitFor();
+  await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'Review lineup plan',exact:true}).click();
+  await page.getByRole('dialog').waitFor();
+  await page.keyboard.press('Escape');
+  for(const width of [360,412,448]){await page.setViewportSize({width,height:1000});await overflow();}
+  await axe('matchup-mobile');
+  await page.screenshot({path:'/tmp/gridiron-matchup-pixel.png',fullPage:true});
+  await page.getByRole('button',{name:'Check available players',exact:true}).click();
+  await page.getByRole('heading',{name:'Work the waiver wire.',exact:true}).waitFor();
+  await page.setViewportSize({width:1440,height:1000});
+  await desktopNav.getByRole('button',{name:/^My team/}).click();
   await page
     .getByRole("navigation", { name: "My team sections" })
     .getByRole("button", { name: "Opponents", exact: true })

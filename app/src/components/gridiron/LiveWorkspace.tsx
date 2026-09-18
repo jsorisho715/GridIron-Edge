@@ -35,6 +35,7 @@ import { PlayerMatchup, PlayerMemory } from "./PlayerContext";
 import { PlayerUsage, UsageBadge } from "./PlayerUsage";
 import { PlayerPhoto } from "./PlayerPhoto";
 import { OpponentDesk } from "./OpponentDesk";
+import { MatchupScreen } from './MatchupScreen';
 import { managerLabel } from "../../lib/league-intel";
 import liveCss from "../../live.css?url";
 
@@ -45,6 +46,7 @@ type Tab =
   | "waivers"
   | "reports"
   | "opponents"
+  | "matchup"
   | "league"
   | "settings"
   | "more";
@@ -55,7 +57,7 @@ const nav = [
   { id: "league", title: "League", icon: ChartLineUp },
 ] as const;
 const sectionFor = (tab: Tab) =>
-  tab === "opponents" || tab === "reports"
+  tab === "opponents" || tab === "reports" || tab === "matchup"
     ? "team"
     : tab === "waivers"
       ? "players"
@@ -186,7 +188,7 @@ export function Workspace() {
   useEffect(() => {
     active.current = true;
     const query = new URLSearchParams(location.search).get("tab");
-    if (["today", "team", "players", "waivers", "reports", "opponents", "league", "settings"].includes(query ?? "")) setTab(query as Tab);
+    if (["today", "team", "players", "waivers", "reports", "opponents", "matchup", "league", "settings"].includes(query ?? "")) setTab(query as Tab);
     void refresh();
     const onVisibility = () => {
       if (document.visibilityState === "visible") void refresh();
@@ -661,7 +663,7 @@ export function Workspace() {
                       : "GRIDIRON EDGE"}
                   </span>
                   <h1>
-                    {tab === "today"
+                    {tab === 'matchup' ? 'Your matchup command center.' : tab === "today"
                       ? "What should you do today?"
                       : tab === "team"
                         ? "Your starting point."
@@ -692,6 +694,7 @@ export function Workspace() {
                 <nav className="gi-section-tabs" aria-label="My team sections">
                   {[
                     { id: "team", label: "Roster" },
+                    { id: "matchup", label: "Matchup" },
                     { id: "opponents", label: "Opponents" },
                     {
                       id: "reports",
@@ -802,8 +805,8 @@ export function Workspace() {
                           : "Best lineup is already set"}
                       </small>
                     </button>
-                    <button className="ge-card" onClick={() => go("opponents")}>
-                      <span>Matchup strategy</span>
+                    <button className="ge-card" onClick={() => go("matchup")}>
+                      <span>Full matchup</span>
                       <strong>{strategy}</strong>
                       <small>
                         {opponent
@@ -828,6 +831,7 @@ export function Workspace() {
                   </section>
                 </>
               )}
+              {snapshot && tab === 'matchup' && <MatchupScreen snapshot={snapshot} onPlayer={setPlayer} onLineup={()=>setPanel('lineup')} onWaivers={()=>go('waivers')} onOpponent={()=>go('opponents')}/>}
               {snapshot && tab === "opponents" && (
                 <OpponentDesk
                   snapshot={snapshot}

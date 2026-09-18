@@ -1310,6 +1310,39 @@
   color: #52675a;
   font-size: 12px;
 }
+.gm-screen { display: grid; gap: 20px; }
+.gm-hero { background: #173f32; color: #fff; padding: 28px; border-radius: 22px; }
+.gm-hero-label { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-size: 12px; letter-spacing: .08em; color: #d1e5d8; }
+.gm-scoreboard { display: grid; grid-template-columns: minmax(0,1fr) 40px minmax(0,1fr); gap: 14px; margin: 32px 0; text-align: center; align-items: center; }
+.gm-scoreboard h2 { font-size: clamp(18px,2.4vw,28px); overflow-wrap: anywhere; }
+.gm-scoreboard p { font-size: 13px; color: #d1e5d8; overflow-wrap: anywhere; }
+.gm-scoreboard strong { display: block; font-size: clamp(26px,5vw,58px); letter-spacing: -.04em; overflow-wrap: anywhere; }
+.gm-scoreboard small { display: block; color: #d1e5d8; }
+.gm-scoreboard span { font-size: 11px; letter-spacing: .1em; }
+.gm-score-note { border-top: 1px solid #668778; padding-top: 16px; color: #d1e5d8; font-size: 12px; line-height: 1.6; }
+.gm-outlook,.gm-panel,.gm-empty { padding: 24px; min-width: 0; }
+.gm-outlook h2,.gm-panel h2 { font-size: 22px; margin-bottom: 16px; }
+.gm-outlook p,.gm-panel p { line-height: 1.65; margin: 12px 0; }
+.gm-estimates { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 12px; margin: 20px 0; }
+.gm-estimates > div { background: #edf3eb; border-radius: 12px; padding: 16px; }
+.gm-estimates span { display: block; font-size: 12px; }
+.gm-estimates strong { display: block; font-size: 24px; margin-top: 6px; }
+.gm-insights { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px; }
+.gm-panel ul { padding-left: 20px; line-height: 1.8; }
+.gm-panel .ge-actions { flex-wrap: wrap; }
+.gm-screen summary { cursor: pointer; min-height: 44px; align-content: center; font-weight: 600; }
+.gm-lineup-head,.gm-lineup-pair { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
+.gm-slot { border-top: 1px solid #d5e0d7; padding-block: 16px; }
+.gm-slot-title { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; margin-bottom: 10px; }
+.gm-slot-title span { color: #435f4e; }
+.gm-player { width: 100%; display: flex; align-items: center; text-align: left; gap: 10px; background: transparent; border: 0; padding: 10px 0; color: inherit; cursor: pointer; }
+.gm-player > span:not(.gi-photo) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.gm-player small { display: block; color: #52675a; font-size: 11px; font-weight: 400; line-height: 1.6; }
+.gm-player > b { font-size: 17px; }
+.gm-mobile-label { display: none; }
+.gm-screen a { text-decoration: underline; }
+.gm-vacancy { color: #52675a; }
+@media(max-width:700px) { .gm-insights,.gm-estimates,.gm-lineup-pair { grid-template-columns: 1fr; } .gm-hero { padding: 20px 16px; } .gm-panel,.gm-outlook { padding: 18px; } .gm-scoreboard { grid-template-columns: minmax(0,1fr) 24px minmax(0,1fr); gap: 8px; } .gm-estimates > div { display:flex; align-items:center; justify-content:space-between; gap:12px; } .gm-estimates strong { font-size:20px; margin:0; } .gm-lineup-head { display:none; } .gm-mobile-label { display:block; color:#435f4e; } .gm-lineup-pair { gap: 4px; } }
 .gt-card { grid-column: 1 / -1; }
 .gt-sides { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
 .gt-side { min-width: 0; padding: 16px; border: 1px solid #b4c8b9; border-radius: 12px; background: #f6f9f5; }
