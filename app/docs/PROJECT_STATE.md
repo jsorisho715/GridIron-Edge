@@ -4,7 +4,7 @@
 - My team → Matchup, Today → Full matchup, or `/app?tab=matchup`. Separate ESPN scoreboard and full-week estimates, manager/team names, model gap, both teams' bench potential, actionable full-lineup plan, strongest/weakest slot comparisons, starter flags, full player comparison, opponent moves/news.
 - `matchup.ts` derives bounded deterministic insights from the existing snapshot. No new feeds, paid calls, database tables or redundant stored snapshots. Actual scores never enter weekly forecast math. Multi-week matchup scores are labeled separately from single-week estimates. No win probability or live final-score prediction claimed.
 - UI respects locked players and incomplete estimates; opponent injuries never become an invented score bonus. Existing player detail, lineup plan, waiver and opponent workflows remain linked.
-- Local checks: 75 tests / 678 assertions; typecheck/build; 17 clean accessibility states including matchup desktop/mobile; no tested overflow at 360/412/448/1440px. Production verification pending.
+- Checks: 75 tests / 678 assertions; typecheck/build; 17 clean accessibility states including matchup desktop/mobile; no tested overflow at 360/412/448/1440px. Production deployed and verified in successful run 35297409186, application commit ed71e94cf852aa15ff48df4fc01f4da40dd3459d.
 
 ## Trade clarity (September 18)
 - Trade cards identify the opposing manager/team and show both teams' incoming/outgoing players, total lineup gain, weekly average and expandable before/after totals. Desktop uses two columns; phones stack the sides. NFL schedules use full names with explicit bye and missing-data labels.

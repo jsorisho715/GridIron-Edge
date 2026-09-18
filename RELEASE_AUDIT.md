@@ -1,5 +1,11 @@
 # Gridiron Edge: live release audit
 
+## Full matchup release: September 18, 2026
+
+Application commit `ed71e94cf852aa15ff48df4fc01f4da40dd3459d` deployed and verified in [successful run 35297409186](https://github.com/jsorisho715/GridIron-Edge/actions/runs/35297409186). The dedicated matchup screen includes both team/manager names, separate actual scores and weekly estimates, both benches' available improvement, complete lineup changes, slot advantages, availability flags, player detail links and opponent updates. No new paid calls or feeds. Forecasts are not presented as live final scores or win probabilities.
+
+75 tests / 678 assertions, typecheck, build, dependency audit, runtime and production verification passed. Browser coverage includes matchup navigation, player dialogs, lineup plan and waiver navigation. All 17 audited accessibility states passed at tested desktop/mobile sizes; 360/412/448/1440px showed no horizontal document overflow. Visual review corrected stretched headshots before release. Historical audits follow.
+
 ## Trade clarity release: September 18, 2026
 
 Application commit `78ae493f1fcdb45ed828b2d350af840f066028cb` deployed and verified in [successful run 35292009617](https://github.com/jsorisho715/GridIron-Edge/actions/runs/35292009617). Trade cards identify the manager and team, compare incoming/outgoing players and both lineup gains, explain NFL schedules, and distinguish saving a plan from executing a trade. Recommendations require positive gains for both teams and at least a rounded 0.5-point larger gain for the owner over the modeled period. Model uncertainty remains visible. No additional model input or paid calls are added by the display metadata.
