@@ -3,7 +3,7 @@ import {currentOpponent,opponentDecisionContext} from './league-intel';
 import {usageEvidence} from './player-usage';
 import {matchupEvidence,matchupContext} from './nfl-context';
 
-export const ADVISOR_VERSION='2026-09-14.2';
+export const ADVISOR_VERSION='2026-09-18.trade';
 export const ADVISOR_MODEL='gpt-5.6-luna';
 export type Risk='careful'|'balanced'|'upside';
 export type DecisionStatus='approved'|'declined'|'completed';
@@ -11,6 +11,7 @@ export type Decision={
   id:string; fingerprint:string; kind:'lineup'|'waiver'|'ir'|'trade'|'matchup'; title:string;
   players:string[]; gain:number|null; horizon:string; evidence:string[]; cautions:string[];
   moves:{playerId:string;slot:string}[]; expiresAt:number; link:string;
+  trade?:{weeks:number[];giveId:string;receiveId:string;owner:{teamId:number;before:number;after:number};partner:{teamId:number;before:number;after:number}};
   status?:DecisionStatus; ai?:{verdict:'pursue'|'watch';priority:number;evidence:number[];cautions:number[]};
 };
 export type AdvisorData={
@@ -95,8 +96,8 @@ export async function generateDecisions(s:Snapshot,risk:Risk='balanced',now=Date
       const targets=theirs.filter(p=>p.status==='ACTIVE'&&!ir(p)&&!isHeld(p,now)).sort((a,b)=>(baseline(b)??0)-(baseline(a)??0)).slice(0,5);
       for(const give of outgoing)for(const get of targets){if(give.position===get.position||assessed>=24)continue;assessed++;
         const a=score([...mine.filter(p=>p.id!==give.id),{...get,teamId:s.teamId,slot:'BE',slotId:20}],s.teamId),b=score([...theirs.filter(p=>p.id!==get.id),{...give,teamId:team.id,slot:'BE',slotId:20}],team.id);
-        if(a===null||b===null||a-ownerBase<minimum*weeks.length||b-theirBase<minimum*weeks.length)continue;
-        trades.push({id:`trade:${give.id}:${get.id}`,kind:'trade',title:`Explore ${give.name} for ${get.name}`,players:[give.id,get.id],gain:rounded(a-ownerBase),horizon:`Next ${weeks.length} weeks combined`,evidence:[`Your optimized starter baseline improves by ${rounded(a-ownerBase)} points; ${team.name} improves by ${rounded(b-theirBase)} points across the same weeks.`,`${give.name}: ${scheduleText(give)}`,`${get.name}: ${scheduleText(get)}`,'Uses ESPN weekly projections where available, otherwise the healthy historical baseline. Actual byes count as zero.'],cautions:[...warnings,'This is a trade idea, not a fair-value guarantee or prediction that the other owner will accept.','Only currently healthy players are modeled. Injury returns, opponent strength, role changes and playoff weeks outside this window are not modeled.','Confirm the trade deadline, roster limits and both owners’ preferences in ESPN.'],moves:[],expiresAt:Math.min(expiry([give,get]),s.tradeDeadline??Infinity),link:teamLink});
+        if(a===null||b===null||a-ownerBase<minimum*weeks.length||b-theirBase<minimum*weeks.length||rounded((a-ownerBase)-(b-theirBase))<0.5)continue;
+        trades.push({id:`trade:${give.id}:${get.id}`,kind:'trade',title:`Get ${get.name} for ${give.name}`,players:[give.id,get.id],gain:rounded(a-ownerBase),horizon:`Next ${weeks.length} weeks combined`,trade:{weeks,giveId:give.id,receiveId:get.id,owner:{teamId:s.teamId,before:ownerBase,after:a},partner:{teamId:team.id,before:theirBase,after:b}},evidence:[`Your best available starting lineup improves by ${rounded(a-ownerBase)} points; the other team's improves by ${rounded(b-theirBase)} points across the same ${weeks.length} weeks. Your projected gain is ${rounded((a-ownerBase)-(b-theirBase))} points larger.`,`You exchange depth at ${give.position} for ${get.name} at ${get.position}; the other team receives ${give.name} at ${give.position}. Both full rosters are re-optimized before and after the exchange.`,'Uses ESPN weekly projections where available, otherwise the healthy historical baseline. Actual byes count as zero.'],cautions:[...warnings,'This is a trade idea, not a fair-value guarantee or prediction that the other owner will accept.','Only currently healthy players are modeled. Injury returns, opponent strength, role changes and playoff weeks outside this window are not modeled.','Confirm the trade deadline, roster limits and both owners’ preferences in ESPN.'],moves:[],expiresAt:Math.min(expiry([give,get]),s.tradeDeadline??Infinity),link:`https://fantasy.espn.com/football/team?leagueId=${s.leagueId}&teamId=${team.id}&seasonId=${s.season}`});
       }
     }
     out.push(...trades.sort((a,b)=>b.gain!-a.gain!).slice(0,2));
@@ -107,6 +108,6 @@ export async function generateDecisions(s:Snapshot,risk:Risk='balanced',now=Date
     const context=relevant.flatMap(p=>matchupEvidence(p,s,now)).filter(f=>!d.evidence.includes(f)).slice(0,2);
     const memory=relevant.flatMap(p=>(s.playerMemory?.[p.id]??[]).slice(0,1).map(text=>`${p.name}, saved history: ${text}`)).slice(0,2);
     d.evidence.push(...context,...memory);
-    return {...d,fingerprint:await digest([ADVISOR_VERSION,s.week,risk,d.id,d.title,d.players,d.gain,d.evidence,d.cautions,d.moves])};
+    return {...d,fingerprint:await digest([ADVISOR_VERSION,s.week,risk,d.id,d.title,d.players,d.gain,d.evidence,d.cautions,d.moves,d.trade])};
   }));
 }

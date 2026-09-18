@@ -1,5 +1,12 @@
 # Gridiron Edge checkpoint
 
+## Trade clarity (September 18)
+- Trade cards identify the opposing manager/team and show both teams' incoming/outgoing players, total lineup gain, weekly average and expandable before/after totals. Desktop uses two columns; phones stack the sides. NFL schedules use full names with explicit bye and missing-data labels.
+- Structured trade metadata is deterministic and excluded from the compact AI prompt. Existing paid call caps remain unchanged. Versioned evidence invalidates older candidate caches.
+- Both sides must retain the risk-specific minimum gain; the owner's projected improvement must exceed the partner's by at least 0.5 points (rounded) over the modeled window. This is lineup utility, not market value or acceptance probability. No guaranteed advantage is claimed.
+- Save trade plan records intent only; the ESPN link opens the partner's team. All cautions remain available. Names use current league metadata without forcing paid reviews for cosmetic changes.
+- Local validation: 72 tests / 666 assertions, typecheck/build, 15 accessibility states and browser flows at 360/412/448/1440px passed. Production verification pending.
+
 ## Trash talk addition (September 16)
 - My team → Opponents → Talk trash works for every league opponent in the picker.
 - Two local template tones, editable draft, non-repeating six-message rotation per tone, copy success/failure feedback. No model tokens, external send, fabricated stats or injury jokes. Drafts are ephemeral and reset when switching opponents.

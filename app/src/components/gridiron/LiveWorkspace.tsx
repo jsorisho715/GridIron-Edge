@@ -786,6 +786,7 @@ export function Workspace() {
                     </small>
                   </section>
                   <DecisionQueue
+                    teams={snapshot.teams}
                     players={snapshot.players}
                     onPlayer={setPlayer}
                     advisor={advisor}

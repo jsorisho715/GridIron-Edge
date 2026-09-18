@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, Check, GearSix, Lightning, ShieldCheck } from "@phosphor-icons/react";
-import type { LeaguePlayer } from "../../lib/football";
+import type { LeaguePlayer, LeagueTeam } from "../../lib/football";
+import { TradeComparison } from './TradeComparison';
 import { PlayerPhoto } from "./PlayerPhoto";
 import type { AdvisorData, Decision, DecisionStatus, Risk } from "../../lib/decisions";
 
@@ -90,11 +91,13 @@ export function DecisionQueue({
   advisor,
   onSettings,
   players = [],
+  teams = [],
   onPlayer,
 }: {
   advisor: Advisor;
   onSettings: () => void;
   players?: LeaguePlayer[];
+  teams?: LeagueTeam[];
   onPlayer?: (p: LeaguePlayer) => void;
 }) {
   const { data, busy, error, act } = advisor,
@@ -138,6 +141,7 @@ export function DecisionQueue({
           ? "Done"
           : d.status === "declined"
             ? "Skipped"
+            : d.kind === 'trade' ? 'Worth exploring'
             : d.ai?.verdict === "pursue" || (d.gain ?? 0) >= 3
               ? "Strong move"
               : (d.gain ?? 0) >= 1
@@ -146,7 +150,7 @@ export function DecisionQueue({
     return (
       <article
         key={d.id}
-        className={"ga-decision " + (i === 0 && !d.status ? "ga-priority" : "")}
+        className={"ga-decision " + (d.kind === 'trade' ? 'gt-card ' : '') + (i === 0 && !d.status ? "ga-priority" : "")}
         aria-label={d.title}
       >
         <div className="ga-card-top">
@@ -156,7 +160,7 @@ export function DecisionQueue({
           </span>
         </div>
         <h3>{d.title}</h3>
-        <div className="gi-decision-players">
+        {d.kind === 'trade' ? <TradeComparison decision={d} players={players} teams={teams} onPlayer={onPlayer}/> : <div className="gi-decision-players">
           {d.players
             .slice(0, 4)
             .map((id) => players.find((p) => p.id === id))
@@ -167,8 +171,8 @@ export function DecisionQueue({
                 <span>{p.name}</span>
               </button>
             ))}
-        </div>
-        <p className="ga-reason">{summary}</p>
+        </div>}
+        {d.kind !== 'trade' && <p className="ga-reason">{summary}</p>}
         <details>
           <summary>Why?</summary>
           <ul>
@@ -180,7 +184,7 @@ export function DecisionQueue({
             <>
               <h4>Check first</h4>
               <ul>
-                {d.cautions.slice(0, 3).map((c, i) => (
+                {d.cautions.slice(0, d.kind === 'trade' ? d.cautions.length : 3).map((c, i) => (
                   <li key={i}>{c}</li>
                 ))}
               </ul>
@@ -196,7 +200,7 @@ export function DecisionQueue({
                 onClick={() => decide(d, "approved")}
               >
                 <Check size={18} />
-                Approve
+                {d.kind === 'trade' ? 'Save trade plan' : 'Approve'}
               </button>
               <button
                 className="ge-button secondary"

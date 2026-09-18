@@ -40,6 +40,11 @@ test('trade ideas require a modeled improvement for both teams, and disappear wi
   const p=(id:string,teamId:number,position:string,points:number,slot:string):LeaguePlayer=>({...s.players[0],id,name:id,teamId,position,status:'ACTIVE',eligible:[position==='QB'?0:2,20],slot,slotId:slot==='BE'?20:position==='QB'?0:2,projected:points,history:Array.from({length:6},(_,i)=>({season:2025,week:i+1,points,projected:null}))});
   s.players=[p('My QB',25,'QB',5,'0:0'),p('My RB',25,'RB',20,'2:0'),p('Spare RB',25,'RB',18,'BE'),p('Their QB',1,'QB',20,'0:0'),p('Their RB',1,'RB',5,'2:0'),p('Spare QB',1,'QB',18,'BE')];
   const trades=(await generateDecisions(s)).filter(d=>d.kind==='trade');expect(trades.length).toBeGreaterThan(0);expect(trades.every(d=>d.gain!>0&&d.evidence[0].includes('improves by'))).toBe(true);
+  for(const d of trades){const t=d.trade!;expect(t.partner.teamId).toBe(1);expect(t.giveId).toBe('Spare RB');expect(t.receiveId).toBe('Their QB');expect(t.owner.after-t.owner.before).toBeGreaterThan(t.partner.after-t.partner.before);expect(d.gain).toBeCloseTo(t.owner.after-t.owner.before,1);expect(d.link).toContain('teamId=1');expect(t.weeks).toEqual([2,3,4,5]);}
+  const betterForThem=structuredClone(s);betterForThem.players.find(p=>p.id==='My QB')!.history.forEach(g=>g.points=15);betterForThem.players.find(p=>p.id==='My QB')!.projected=15;
+  expect((await generateDecisions(betterForThem)).filter(d=>d.kind==='trade')).toHaveLength(0);
+  const equal=structuredClone(s);equal.players.find(p=>p.id==='Their QB')!.history.forEach(g=>g.points=18);equal.players.find(p=>p.id==='Their QB')!.projected=18;
+  expect((await generateDecisions(equal)).filter(d=>d.kind==='trade')).toHaveLength(0);
   s.tradeDeadline=Date.now()-1;expect((await generateDecisions(s)).filter(d=>d.kind==='trade')).toHaveLength(0);s.tradeDeadline=null;s.players[0].future=[];expect((await generateDecisions(s)).filter(d=>d.kind==='trade')).toHaveLength(0);
 });
 test('stable evidence ignores timestamps and scores, but notices locks, status, roster and schedule changes',async()=>{
